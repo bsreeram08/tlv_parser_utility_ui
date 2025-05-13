@@ -1,0 +1,243 @@
+# Payment Technology Toolkit - Code Standards & Guidelines
+
+## Memory Bank
+
+DO NOT USE INBUILD MEMORY OR CASCADE MEMORY FOR ANYTHING. ALWAYS USE MEMORY BANK.
+
+The Memory Bank consists of core files and optional context files, all in Markdown format. Files build upon each other in a clear hierarchy:
+
+```mermaid
+flowchart TD
+PB[projectbrief.md] --> PC[productContext.md]
+PB --> SP[systemPatterns.md]
+PB --> TC[techContext.md]
+
+PC --> AC[activeContext.md]
+SP --> AC
+TC --> AC
+
+AC --> P[progress.md]
+```
+
+### Core Files (Required)
+
+1. `projectbrief.md`
+
+   - Foundation document that shapes all other files
+   - Created at project start if it doesn't exist
+   - Defines core requirements and goals
+   - Source of truth for project scope
+
+2. `productContext.md`
+
+   - Why this project exists
+   - Problems it solves
+   - How it should work
+   - User experience goals
+
+3. `activeContext.md`
+
+   - Current work focus
+   - Recent changes
+   - Next steps
+   - Active decisions and considerations
+   - Important patterns and preferences
+   - Learnings and project insights
+
+4. `systemPatterns.md`
+
+   - System architecture
+   - Key technical decisions
+   - Design patterns in use
+   - Component relationships
+   - Critical implementation paths
+
+5. `techContext.md`
+
+   - Technologies used
+   - Development setup
+   - Technical constraints
+   - Dependencies
+   - Tool usage patterns
+
+6. `progress.md`
+   - What works
+   - What's left to build
+   - Current status
+   - Known issues
+   - Evolution of project decisions
+
+### Additional Context
+
+Create additional files/folders within memory-bank/ when they help organize:
+
+- Complex feature documentation
+- Integration specifications
+- API documentation
+- Testing strategies
+- Deployment procedures
+
+## Core Workflows
+
+### Plan Mode
+
+flowchart TD
+Start[Start] --> ReadFiles[Read Memory Bank]
+ReadFiles --> CheckFiles{Files Complete?}
+
+    CheckFiles -->|No| Plan[Create Plan]
+    Plan --> Document[Document in Chat]
+
+    CheckFiles -->|Yes| Verify[Verify Context]
+    Verify --> Strategy[Develop Strategy]
+    Strategy --> Present[Present Approach]
+
+### Act Mode
+
+flowchart TD
+Start[Start] --> Context[Check Memory Bank]
+Context --> Update[Update Documentation]
+Update --> Execute[Execute Task]
+Execute --> Document[Document Changes]
+
+## Project Rules
+
+- Create memory-bank and always keep the memory-bank up to date about the project
+- If the memory-bank directory does not exist, create it
+
+  - Ask the user 100s and 1000s of questions if required to create the perfect memory-bank
+
+- If the memory-bank directory exists, update it with the latest changes
+- Memory Bank updates occur when:
+
+  1. Discovering new project patterns
+  2. After implementing significant changes
+  3. When user requests with **update memory bank** (MUST review ALL files)
+  4. When context needs clarification
+
+  ```mermaid
+  flowchart TD
+      Start[Update Process]
+
+      subgraph Process
+          P1[Review ALL Files]
+          P2[Document Current State]
+          P3[Clarify Next Steps]
+          P4[Document Insights & Patterns]
+
+          P1 --> P2 --> P3 --> P4
+      end
+
+      Start --> Process
+
+  ```
+
+## General Code Style & Formatting
+
+- Use English for all code and documentation.
+- Always declare the type of each variable and function (parameters and return value).
+- Avoid using `any` type - use appropriate cryptographic or payment-specific types instead.
+- Create necessary types for payment data structures (ISO8583 messages, EMV tags, etc.).
+- Use JSDoc to document public classes and methods, including cryptographic parameters.
+- Don't leave blank lines within a function.
+- One export per file for better modularity.
+- Format and lint code using Prettier and ESLint with configured rules.
+
+## Project-Specific Naming Conventions
+
+- Use PascalCase for classes and React components.
+- Use camelCase for variables, functions, and methods.
+- Use kebab-case for file and directory names.
+- Use UPPERCASE for environment variables.
+- Use UPPERCASE_SNAKE_CASE for cryptographic constants.
+- Use descriptive prefixes for specific tool categories:
+  - `crypto` for cryptographic utilities
+  - `emv` for EMV-related functions
+  - `iso` for ISO8583 message handling
+  - `pin` for PIN block operations
+  - `card` for card security functions
+- Avoid magic numbers and define constants, especially for:
+  - Cryptographic algorithm identifiers
+  - EMV tag values
+  - ISO8583 field numbers
+  - PIN block formats
+
+## Functions & Logic
+
+- Keep functions short and single-purpose (<20 lines).
+- For cryptographic implementations, include source references in comments.
+- Avoid deeply nested blocks by:
+  - Using early returns.
+  - Extracting logic into utility functions.
+- Use higher-order functions (map, filter, reduce) to simplify logic.
+- Use arrow functions for simple cases (<3 instructions), named functions otherwise.
+- Use default parameter values instead of null/undefined checks.
+- Use RO-RO (Receive Object, Return Object) for passing and returning multiple parameters.
+- Implement error handling for all cryptographic and parsing operations.
+
+## Data Handling and Security
+
+- Avoid excessive use of primitive types; encapsulate data in composite types.
+- Implement proper validation for all inputs, especially for cryptographic functions.
+- Prefer immutability for data:
+  - Use `readonly` for immutable properties.
+  - Use `as const` for literals that never change.
+- Implement clear data flow for cryptographic operations.
+- Never store sensitive data (keys, PINs) in state longer than necessary.
+- Use secure string handling practices for sensitive data:
+  - Sanitize inputs
+  - Validate data formats before processing
+  - Clear sensitive data from memory when no longer needed
+
+## React Component Structure
+
+- Create single-responsibility components.
+- Separate display logic from cryptographic/business logic.
+- Use custom hooks for complex form state management.
+- Implement consistent error handling and validation for all form inputs.
+- Use controlled components for all input elements.
+- Follow a consistent component folder structure:
+  - Component file (ComponentName.tsx)
+  - Types file (ComponentName.types.ts)
+  - Utility functions (ComponentName.utils.ts)
+  - Tests (ComponentName.test.tsx)
+
+## Project-Specific Testing Standards
+
+- Write unit tests for all cryptographic functions with known test vectors.
+- Implement integration tests for complex calculator components.
+- Test with valid and invalid inputs, boundary cases, and edge conditions.
+- Verify cryptographic implementations against published test vectors.
+- Document test vector sources in test files.
+
+## Documentation Requirements
+
+- Document all cryptographic algorithms with references to standards.
+- Include brief descriptions of EMV tags and ISO8583 fields.
+- Document data formats and conversions.
+- Include explanatory comments for complex bitwise operations.
+- Document the source/standard for all algorithm implementations.
+
+## EMV & ISO8583 Specific Guidelines
+
+- Use standardized EMV tag naming conventions as defined in EMV Book 3.
+- Follow ISO8583 field naming conventions consistently.
+- Use enums for EMV tag values and ISO8583 message types.
+- Implement validation for EMV TLV structures.
+- Validate bit positions in ISO8583 bitmaps.
+- Implement robust parsing for constructed TLV objects.
+
+## Cryptographic Implementation Guidelines
+
+- Document key lengths and algorithm modes.
+- Include padding methods in function parameters.
+- Validate keys before use (parity, length, format).
+- Implement constant-time comparisons for cryptographic values.
+- Document key formats (clear components, encrypted, check values).
+- Use Web Crypto API where applicable for better security.
+
+Note: When triggered by **update memory bank**, I MUST review every memory bank file, even if some don't require updates. Focus particularly on activeContext.md and progress.md as they track current state.
+
+REMEMBER: After every memory reset, I begin completely fresh. The Memory Bank is my only link to previous work. It must be maintained with precision and clarity, as my effectiveness depends entirely on its accuracy.
+
+DO NOT USE INBUILD MEMORY OR CASCADE MEMORY FOR ANYTHING. ALWAYS USE MEMORY BANK.
