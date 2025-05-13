@@ -1,25 +1,36 @@
 import Dexie from "dexie";
 import type { Table } from "dexie";
+import type { CustomTagDefinition } from "@/types/custom-tag";
 
 // Define the saved data structure for TLV tests
 export interface SavedTlvTest {
   id?: number;
-  date: Date;
   name: string;
-  hexData: string;
   description?: string;
+  tlvData: string;
+  date: Date;
   tags?: string[];
+  category?: string; // E.g., "EMV Card", "Payment Terminal", "Test Data"
+  favorite?: boolean; // To mark frequently used tests
+  lastAccessed?: Date; // When the test was last loaded
+  source?: string; // Where the test came from (e.g., "Manual", "Imported")
+  version?: string; // Optional version for tracking changes to the test
 }
 
 // Define the saved data structure for ISO 8583 tests
 export interface SavedIsoTest {
   id?: number;
-  date: Date;
   name: string;
-  message: string;
-  version: string;
   description?: string;
+  isoData: string;
+  version: string; // ISO 8583 version used
+  date: Date;
   tags?: string[];
+  category?: string; // E.g., "Financial", "Network Management", "Test Data"
+  favorite?: boolean; // To mark frequently used tests
+  lastAccessed?: Date; // When the test was last loaded
+  source?: string; // Where the test came from (e.g., "Manual", "Imported")
+  messageType?: string; // Message type identifier (e.g., "0200" for authorization request)
   options?: Record<string, unknown>;
 }
 
@@ -27,12 +38,24 @@ export interface SavedIsoTest {
 export class PaymentUtilsDB extends Dexie {
   tlvTests!: Table<SavedTlvTest>;
   isoTests!: Table<SavedIsoTest>;
+  customTags!: Table<CustomTagDefinition>;
 
   constructor() {
     super("paymentUtilsDB");
     this.version(1).stores({
       tlvTests: "++id, date, name, *tags",
       isoTests: "++id, date, name, version, *tags",
+    });
+    
+    // Add custom tags table in version 2
+    this.version(2).stores({
+      customTags: "id, name, format, dataFormat, created, modified"
+    });
+    
+    // Enhanced storage with improved indexes in version 3
+    this.version(3).stores({
+      tlvTests: "++id, date, name, *tags, category, favorite, lastAccessed, source, version",
+      isoTests: "++id, date, name, version, *tags, category, favorite, lastAccessed, source, messageType"
     });
   }
 
@@ -70,6 +93,52 @@ export class PaymentUtilsDB extends Dexie {
   // Delete an ISO 8583 test
   async deleteIsoTest(id: number): Promise<void> {
     return await this.isoTests.delete(id);
+  }
+  
+  // Custom Tag methods
+  
+  // Add a new custom tag definition
+  async addCustomTag(tag: CustomTagDefinition): Promise<void> {
+    // Check if tag with this ID already exists
+    const existingTag = await this.customTags.get(tag.id);
+    if (existingTag) {
+      throw new Error(`A custom tag with ID ${tag.id} already exists`);
+    }
+    
+    await this.customTags.add(tag);
+  }
+  
+  // Update an existing custom tag
+  async updateCustomTag(tag: CustomTagDefinition): Promise<number> {
+    // Set modified date
+    const updatedTag = {
+      ...tag,
+      modified: new Date()
+    };
+    
+    return await this.customTags.update(tag.id, updatedTag);
+  }
+  
+  // Get a custom tag by ID
+  async getCustomTag(id: string): Promise<CustomTagDefinition | undefined> {
+    return await this.customTags.get(id);
+  }
+  
+  // Get all custom tags
+  async getAllCustomTags(): Promise<CustomTagDefinition[]> {
+    return await this.customTags.toArray();
+  }
+  
+  // Delete a custom tag
+  async deleteCustomTag(id: string): Promise<void> {
+    return await this.customTags.delete(id);
+  }
+  
+  // Search for custom tags by name
+  async searchCustomTagsByName(query: string): Promise<CustomTagDefinition[]> {
+    return await this.customTags
+      .filter(tag => tag.name.toLowerCase().includes(query.toLowerCase()))
+      .toArray();
   }
 }
 

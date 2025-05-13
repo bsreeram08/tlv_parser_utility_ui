@@ -7,7 +7,7 @@
 
 import { useState, type JSX, useCallback } from "react";
 import { TlvInput } from "./tlv-input";
-import { TlvDisplay } from "./tlv-display";
+import { CompactTlvDisplay } from "./compact-tlv-display";
 import { type TlvParsingResult, parseTlv, formatTlvAsJson } from "@/utils/tlv";
 import {
   Card,
@@ -19,12 +19,14 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FloatingActionButton } from "@/components/ui/fab";
 import { SaveDialog } from "@/components/ui/save-dialog";
-import { TestsDrawer } from "@/components/ui/tests-drawer";
+import { EnhancedTestsDrawer } from "@/components/ui/enhanced-tests-drawer";
 import { useHotkeys } from "@/hooks/use-hotkeys";
 import { db } from "@/utils/db/db";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Save, FolderOpen } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Save, FolderOpen, HelpCircle } from "lucide-react";
 
 // Example TLV data for demonstration
 const EXAMPLE_TLV_DATA =
@@ -35,6 +37,7 @@ export function TlvViewer(): JSX.Element {
   const [activeTab, setActiveTab] = useState<string>("viewer");
   const [inputHex, setInputHex] = useState<string>("");
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [showUnknownTags, setShowUnknownTags] = useState(true);
 
   /**
    * Handle parsing of TLV data
@@ -92,8 +95,11 @@ export function TlvViewer(): JSX.Element {
         name,
         description,
         tags,
-        hexData: inputHex,
+        tlvData: inputHex,
         date: new Date(),
+        category: "Manual", // Default category
+        source: "Manual",
+        lastAccessed: new Date(),
       });
 
       return true;
@@ -106,9 +112,12 @@ export function TlvViewer(): JSX.Element {
   /**
    * Load a saved TLV test
    */
-  const handleLoad = (hexData: string) => {
-    setInputHex(hexData);
-    handleParse(hexData);
+  const handleLoad = (tlvData: string, _options?: Record<string, unknown>) => {
+    setInputHex(tlvData);
+    handleParse(tlvData);
+    
+    // We don't need to update lastAccessed timestamp here
+    // as it's already handled in the TestsDrawer component
   };
 
   // Register keyboard shortcuts
@@ -174,6 +183,40 @@ export function TlvViewer(): JSX.Element {
     }
   }, [parseResult]);
 
+  /**
+   * Get the count of known tags in the result
+   */
+  const getKnownTagsCount = (elements: TlvParsingResult["elements"]) => {
+    return elements.filter((element) => !element.isUnknown).length;
+  };
+
+  /**
+   * Filter out unknown tags from the parsing result
+   */
+  const filterUnknownTags = (
+    result: TlvParsingResult | null
+  ): TlvParsingResult | null => {
+    if (!result) return null;
+
+    // Function to filter elements recursively
+    const filterElements = (elements: TlvParsingResult["elements"]) => {
+      return elements
+        .filter((element) => !element.isUnknown)
+        .map((element) => ({
+          ...element,
+          // Filter children recursively if they exist
+          children: element.children
+            ? filterElements(element.children)
+            : undefined,
+        }));
+    };
+
+    return {
+      ...result,
+      elements: filterElements(result.elements),
+    };
+  };
+
   return (
     <>
       <Card className="w-full max-w-4xl mx-auto">
@@ -200,7 +243,7 @@ export function TlvViewer(): JSX.Element {
                 <Save className="h-4 w-4" /> Save
               </Button>
 
-              <TestsDrawer testType="tlv" onLoad={handleLoad}>
+              <EnhancedTestsDrawer testType="tlv" onLoad={handleLoad}>
                 <Button
                   id="load-tlv-button"
                   variant="outline"
@@ -209,7 +252,7 @@ export function TlvViewer(): JSX.Element {
                 >
                   <FolderOpen className="h-4 w-4" /> Load
                 </Button>
-              </TestsDrawer>
+              </EnhancedTestsDrawer>
             </div>
           </div>
         </CardHeader>
@@ -229,7 +272,56 @@ export function TlvViewer(): JSX.Element {
             </TabsContent>
 
             <TabsContent value="results" className="mt-0">
-              <TlvDisplay result={parseResult} />
+              <>
+                {/* Controls for filtering tags */}
+                <div className="mb-4 flex items-center justify-between bg-muted/30 p-3 rounded-md">
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="show-unknown-tags"
+                        checked={showUnknownTags}
+                        onCheckedChange={setShowUnknownTags}
+                      />
+                      <Label htmlFor="show-unknown-tags">
+                        Show Unknown Tags
+                      </Label>
+                    </div>
+
+                    <div className="flex items-center text-xs text-muted-foreground gap-1">
+                      <HelpCircle className="h-3 w-3" />
+                      <span>
+                        {showUnknownTags
+                          ? "Displaying all tags, including unknown ones"
+                          : "Hidden unknown tags"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="text-sm text-muted-foreground">
+                    {parseResult && (
+                      <span>
+                        {parseResult.elements.length} tag
+                        {parseResult.elements.length !== 1 ? "s" : ""} found
+                        {!showUnknownTags && (
+                          <>
+                            {" "}
+                            ({getKnownTagsCount(parseResult.elements)} known)
+                          </>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <CompactTlvDisplay
+                  result={
+                    showUnknownTags
+                      ? parseResult
+                      : filterUnknownTags(parseResult)
+                  }
+                  onRefresh={() => handleParse(inputHex)}
+                />
+              </>
             </TabsContent>
           </Tabs>
         </CardContent>

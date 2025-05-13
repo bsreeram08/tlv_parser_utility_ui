@@ -22,6 +22,12 @@ import {
   DialogTitle,
   DialogHeader,
 } from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { TlvParsingError } from "@/types/tlv";
 import { toast } from "sonner";
 
@@ -76,18 +82,45 @@ export function FloatingActionButton({
 
   return (
     <>
-      {/* Main Floating Action Button */}
+      {/* Main Floating Action Button with Notification Badge */}
       <div className="fixed right-6 bottom-6 z-50">
         <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-          <DropdownMenuTrigger asChild>
-            <Button size="lg" className="h-14 w-14 rounded-full shadow-lg">
-              <Plus
-                className={`h-6 w-6 transition-transform duration-200 ${
-                  isOpen ? "rotate-45" : ""
-                }`}
-              />
-            </Button>
-          </DropdownMenuTrigger>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="relative">
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="lg"
+                      className="h-14 w-14 rounded-full shadow-lg"
+                    >
+                      <Plus
+                        className={`h-6 w-6 transition-transform duration-200 ${
+                          isOpen ? "rotate-45" : ""
+                        }`}
+                      />
+                    </Button>
+                  </DropdownMenuTrigger>
+
+                  {/* Notification Badge */}
+                  {errors.length > 0 && (
+                    <div className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full min-w-6 h-6 flex items-center justify-center text-xs font-medium px-1.5 shadow-sm border-2 border-background animate-pulse">
+                      {errors.length}
+                    </div>
+                  )}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent
+                side="left"
+                className="bg-destructive text-destructive-foreground"
+              >
+                {errors.length === 1
+                  ? "1 error detected"
+                  : `${errors.length} errors detected`}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuItem
               disabled={errors.length === 0}

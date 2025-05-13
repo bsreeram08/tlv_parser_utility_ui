@@ -18,7 +18,7 @@ import { getTagInfo } from "./tag-registry";
  * Default parsing options
  */
 const DEFAULT_OPTIONS: TlvParsingOptions = {
-  ignoreUnknownTags: false,
+  ignoreUnknownTags: false, // Changed to false by default (unknown tags are shown, not ignored)
   validateLength: true,
   stopOnError: false,
   parseConstructed: true,
@@ -110,10 +110,13 @@ function parseElement(
 
   // Get additional information about the tag
   const tagInfo = getTagInfo(tagId);
-
-  // Check if we should ignore unknown tags
-  if (!tagInfo && !options.ignoreUnknownTags) {
-    throw new Error(`Unknown tag: ${tagId} at position ${startPos}`);
+  
+  // Check if this is an unknown tag
+  const isUnknownTag = !tagInfo;
+  
+  // If we should ignore unknown tags completely, stop processing this element
+  if (isUnknownTag && options.ignoreUnknownTags) {
+    throw new Error(`Unknown tag: ${tagId} at position ${startPos} (ignored by configuration)`);
   }
 
   // Parse the length field
@@ -143,6 +146,7 @@ function parseElement(
     tagInfo,
     rawHex: hexString.substring(startPos, valueEndPos),
     offset: startPos,
+    isUnknown: isUnknownTag, // Flag if this is an unknown tag
   };
 
   // Parse constructed tags recursively if enabled

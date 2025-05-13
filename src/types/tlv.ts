@@ -34,6 +34,7 @@ export type EmvTag = {
   readonly maxLength?: number; // Maximum length if specified
   readonly fixedLength?: number; // Fixed length if applicable
   readonly isPropriety?: boolean; // Whether this is a proprietary tag
+  readonly valueType?: "binary" | "numeric" | "text" | "mixed";
 };
 
 /**
@@ -47,6 +48,7 @@ export type TlvElement = {
   children?: TlvElement[]; // Nested TLV elements (for constructed tags)
   readonly rawHex?: string; // Original hex representation
   readonly offset?: number; // Offset in the original data
+  readonly isUnknown?: boolean; // Flag indicating if this is an unknown tag
 };
 
 /**

@@ -6,6 +6,7 @@
  */
 
 import { type EmvTag, TagClass, TagFormat } from "@/types/tlv";
+import { allPredefinedCustomTags } from "./predefined-custom-tags";
 
 /**
  * Map of tag IDs to their definitions
@@ -206,6 +207,24 @@ function registerStandardTags(): void {
 
 // Initialize the registry with standard tags
 registerStandardTags();
+
+// Load predefined custom tags
+allPredefinedCustomTags.forEach((tag) => {
+  registerTag(tag);
+});
+
+// This event will be triggered when the database has loaded custom tags
+document.addEventListener("CustomTagsLoaded", (event: Event) => {
+  // If we receive custom tags from the database, register them
+  const customEvent = event as CustomEvent<EmvTag[]>;
+  const customTags = customEvent.detail;
+
+  if (customTags && Array.isArray(customTags)) {
+    customTags.forEach((tag) => {
+      registerTag(tag);
+    });
+  }
+});
 
 /**
  * Get information about a specific tag

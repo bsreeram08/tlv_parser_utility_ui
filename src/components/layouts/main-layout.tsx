@@ -7,14 +7,27 @@ import {
   Settings,
   Menu,
   X,
+  Tag,
+  ChevronDown,
+  GitCompare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "sonner";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useState } from "react";
+import {
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+} from "@/components/ui/sidebar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 // Define the available modules
-type ActiveModule = "tlv" | "iso8583" | "crypto" | "settings";
+type ActiveModule = "tlv" | "iso8583" | "crypto" | "settings" | "custom-tags" | "tlv-comparison";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -53,13 +66,42 @@ export function MainLayout({
         <div className="p-6">
           <h2 className="font-semibold text-xl mb-6">Payment Utilities</h2>
           <nav className="space-y-1">
-            <SidebarItem
-              icon={<FileCode size={18} />}
-              current={activeModule === "tlv"}
-              onClick={() => onNavigate("tlv")}
-            >
-              TLV Parser
-            </SidebarItem>
+            <Collapsible defaultOpen className="group/collapsible">
+              <SidebarGroup>
+                <SidebarGroupLabel asChild>
+                  <CollapsibleTrigger className="flex flex-row items-center gap-x-16">
+                    TLV Utilities
+                    <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                  </CollapsibleTrigger>
+                </SidebarGroupLabel>
+                <CollapsibleContent>
+                  <SidebarGroupContent>
+                    <SidebarItem
+                      icon={<FileCode size={18} />}
+                      current={activeModule === "tlv"}
+                      onClick={() => onNavigate("tlv")}
+                    >
+                      TLV Parser
+                    </SidebarItem>
+                    <SidebarItem
+                      icon={<Tag size={18} />}
+                      current={activeModule === "custom-tags"}
+                      onClick={() => onNavigate("custom-tags")}
+                    >
+                      Custom Tags
+                    </SidebarItem>
+                    <SidebarItem
+                      icon={<GitCompare size={18} />}
+                      current={activeModule === "tlv-comparison"}
+                      onClick={() => onNavigate("tlv-comparison")}
+                    >
+                      TLV Compare
+                    </SidebarItem>
+                  </SidebarGroupContent>
+                </CollapsibleContent>
+              </SidebarGroup>
+            </Collapsible>
+
             <SidebarItem
               icon={<CreditCard size={18} />}
               current={activeModule === "iso8583"}
@@ -97,6 +139,8 @@ export function MainLayout({
           <div className="w-full flex justify-between items-center">
             <h1 className="font-semibold text-lg">
               {activeModule === "tlv" && "TLV Parser"}
+              {activeModule === "custom-tags" && "Custom Tag Management"}
+              {activeModule === "tlv-comparison" && "TLV Comparison Tool"}
               {activeModule === "iso8583" && "ISO 8583 Message Parser"}
               {activeModule === "crypto" && "Cryptography Tools"}
               {activeModule === "settings" && "Settings"}
