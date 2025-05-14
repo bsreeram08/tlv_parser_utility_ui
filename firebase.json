@@ -1,0 +1,10 @@
+{
+  "hosting": {
+    "site": "payment-tlv-utilities",
+    "source": ".",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "frameworksBackend": {
+      "region": "asia-east1"
+    }
+  }
+}
