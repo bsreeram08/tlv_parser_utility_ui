@@ -1,8 +1,15 @@
 # Active Context
 
-## Recent Changes (2025-05-13)
+## Recent Changes (2025-05-14)
+
+### UI Theme and Color Fixes
+
+- Fixed UI color issues by reverting to Tailwind CSS utility classes for backgrounds and text, ensuring consistent appearance across all components.
+- Removed the highlight feature from tag actions and related components, as it was deemed unnecessary.
+- Ensured all tag rendering and comparison tables use clear, accessible color schemes (green for added, red for removed, amber for modified).
 
 ### TLV Viewer Redesign
+
 - Replaced the old TLV display with `CompactTlvDisplay` for a much cleaner, scannable layout.
 - All tags are now visible at a glance, with expandable rows for detailed info.
 - Tag descriptions are available as tooltips on hover.
@@ -11,6 +18,7 @@
 - Unknown and custom tags are visually distinct.
 
 ### TLV Comparison Tool Redesign
+
 - Old comparison UI replaced by a new, unified, and simplified tool (`SimplifiedTlvComparison`).
 - Inputs for two TLV streams with clear labels and load-from-drawer integration.
 - Unified table view: all tags from both streams are shown in a single table, with side-by-side values.
@@ -20,10 +28,12 @@
 - All logic for tag mapping, difference calculation, and unified row generation is now memoized and more efficient.
 
 ### Codebase/UX Improvements
+
 - App module type and navigation updated for new features.
 - All previous comparison and display logic replaced in favor of new, user-driven design.
 
 ## Upcoming Tasks / Ideas
+
 - Implement custom UI renderers for specific tags (e.g., full UI for tag `9C` Transaction Type, CVR, etc.).
 - Allow users to register custom tag UIs via config/code.
 - Add quick search/filter for tags in the TLV viewer.
@@ -52,17 +62,20 @@
 ## Next Steps
 
 1. Phase 1: Implement custom tag definition system
+
    - Create data model for custom tags
    - Implement storage and retrieval
    - Build UI for tag management
    - Integrate with existing TLV parser
 
 2. Phase 2: Implement unknown tag handling
+
    - Modify parser to display unknown tags
    - Add appropriate styling and indicators
    - Implement filtering options
 
 3. Phase 3: Enhance TLV storage system
+
    - Extend data model for saved TLV samples
    - Improve the categorization and search features
    - Enhance the library management UI

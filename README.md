@@ -77,10 +77,11 @@ Project context, architecture, and progress are documented in the `memory-bank/`
 
 - `activeContext.md` – Current focus, recent changes, next steps
 - `progress.md` – What works, what's left, known issues
-- `systemPatterns.md`, `techContext.md`, etc.
+- `systemPatterns.md` – Architecture and design patterns
+- `techContext.md` – Technical stack and constraints
+- `productContext.md` – Product rationale and user experience
+- `projectbrief.md` – Core requirements and goals
+
+See the [Memory Bank Guidelines](memory-bank/) for how to add or update documentation.
 
 ---
-
-## License
-
-MIT (or specify your license here)
