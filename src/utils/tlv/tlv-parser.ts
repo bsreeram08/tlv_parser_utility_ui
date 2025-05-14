@@ -11,8 +11,15 @@ import {
   type TlvParsingOptions,
   type TlvParsingResult,
   TagFormat,
+  TagClass,
 } from "@/types/tlv";
 import { getTagInfo } from "./tag-registry";
+
+/**
+ * Set of tag IDs that should be treated as constructed tags with nested TLVs
+ * regardless of their definition in the tag registry.
+ */
+const FORCE_CONSTRUCTED_TAGS = new Set(["E0", "E1", "E2", "E3"]);
 
 /**
  * Default parsing options
@@ -138,22 +145,45 @@ function parseElement(
   // Extract the value
   const value = hexString.substring(valueStartPos, valueEndPos);
 
+  // Check if this is a tag that should be treated as constructed (E0, E1, E2, E3)
+  const isForceConstructed = FORCE_CONSTRUCTED_TAGS.has(tagId);
+
+  // If this is a force-constructed tag but it doesn't have tag info yet,
+  // create a synthetic tag info to ensure proper behavior
+  let effectiveTagInfo = tagInfo;
+  if (isForceConstructed && !tagInfo) {
+    effectiveTagInfo = {
+      id: tagId,
+      name: `Force Constructed ${tagId}`,
+      description: `Nested TLV container (${tagId})`,
+      format: TagFormat.CONSTRUCTED,
+      class: TagClass.APPLICATION,
+      isPropriety: true
+    };
+  } else if (isForceConstructed && tagInfo && tagInfo.format !== TagFormat.CONSTRUCTED) {
+    // If tag exists but isn't constructed, create a modified version that is constructed
+    effectiveTagInfo = {
+      ...tagInfo,
+      format: TagFormat.CONSTRUCTED,
+      description: `${tagInfo.description} (Treated as nested TLV container)`
+    };
+  }
+
   // Create the TLV element
   const element: TlvElement = {
     tag: tagId,
     length: dataLength,
     value,
-    tagInfo,
+    tagInfo: effectiveTagInfo,
     rawHex: hexString.substring(startPos, valueEndPos),
     offset: startPos,
-    isUnknown: isUnknownTag, // Flag if this is an unknown tag
+    isUnknown: isUnknownTag && !isForceConstructed, // Only unknown if not force constructed
   };
 
   // Parse constructed tags recursively if enabled
   if (
     options.parseConstructed &&
-    tagInfo &&
-    tagInfo.format === TagFormat.CONSTRUCTED
+    (isForceConstructed || (tagInfo && tagInfo.format === TagFormat.CONSTRUCTED))
   ) {
     try {
       const constructedResult = parseTlv(value, options);
