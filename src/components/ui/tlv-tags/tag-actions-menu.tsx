@@ -7,13 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Bookmark,
-  Copy,
-  MoreHorizontal,
-  TagIcon,
-  FileText,
-} from "lucide-react";
+import { Copy, MoreHorizontal, TagIcon, FileText } from "lucide-react";
 
 export interface TagActionsMenuProps {
   tag: string;
@@ -21,7 +15,11 @@ export interface TagActionsMenuProps {
   path?: string;
 }
 
-export function TagActionsMenu({ tag, value, path }: TagActionsMenuProps) {
+export function TagActionsMenu({
+  tag,
+  value,
+  path: _path,
+}: TagActionsMenuProps) {
   const [open, setOpen] = useState(false);
 
   const handleCopyTag = async () => {

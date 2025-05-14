@@ -10,7 +10,6 @@
 
 import {
   type Bitmap,
-  FieldFormat,
   type Iso8583ParseError,
   type Iso8583ParseOptions,
   type Iso8583ParseResult,
@@ -386,7 +385,7 @@ function parseField(
   position: number,
   fieldId: number,
   fieldDefinition: any,
-  version: Iso8583Version
+  _version: Iso8583Version
 ): { field: IsoField; nextPos: number; error?: Iso8583ParseError } {
   // Initialize field
   const field: IsoField = {
@@ -398,7 +397,7 @@ function parseField(
   try {
     let fieldLength = 0;
     let lengthIndicator = "";
-    let startPos = position;
+    // let startPos = position;
 
     // For variable length fields, parse the length indicator
     if (fieldDefinition?.lengthType === LengthType.VARIABLE) {

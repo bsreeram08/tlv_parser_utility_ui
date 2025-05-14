@@ -246,7 +246,7 @@ registerISO8583_1987Fields();
  */
 export function getFieldDefinition(
   fieldId: number,
-  version: Iso8583Version = Iso8583Version.V1987
+  _version: Iso8583Version = Iso8583Version.V1987
 ): FieldDefinition | undefined {
   const fieldDef = fieldRegistry.get(fieldId.toString());
   if (fieldDef) {
@@ -281,7 +281,7 @@ export function registerFieldDefinition(fieldDef: FieldDefinition): boolean {
  * @returns Array of all field definitions
  */
 export function getAllFieldDefinitions(
-  version: Iso8583Version = Iso8583Version.V1987
+  _version: Iso8583Version = Iso8583Version.V1987
 ): FieldDefinition[] {
   return Array.from(fieldRegistry.values());
 }

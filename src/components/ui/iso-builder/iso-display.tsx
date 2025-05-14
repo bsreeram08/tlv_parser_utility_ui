@@ -1,6 +1,6 @@
 /**
  * ISO 8583 Display Component
- * 
+ *
  * A component for displaying parsed ISO 8583 message data in a structured, readable format.
  */
 
@@ -10,21 +10,14 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { 
+import {
   Accordion,
   AccordionContent,
   AccordionItem,
-  AccordionTrigger 
+  AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 
 interface IsoDisplayProps {
   result: Iso8583ParseResult | null;
@@ -54,9 +47,8 @@ export function IsoDisplay({ result }: IsoDisplayProps): JSX.Element {
               {result.errors.map((error, index) => (
                 <li key={index}>
                   {error.message}
-                  {error.fieldId !== undefined && 
-                    ` (Field ${error.fieldId})`}
-                  {error.position !== undefined && 
+                  {error.fieldId !== undefined && ` (Field ${error.fieldId})`}
+                  {error.position !== undefined &&
                     ` (at position ${error.position})`}
                 </li>
               ))}
@@ -84,15 +76,24 @@ export function IsoDisplay({ result }: IsoDisplayProps): JSX.Element {
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium">Class</TableCell>
-                <TableCell>{result.mti.class} - {getMtiClassDescription(result.mti.class)}</TableCell>
+                <TableCell>
+                  {result.mti.class} -{" "}
+                  {getMtiClassDescription(result.mti.class)}
+                </TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium">Function</TableCell>
-                <TableCell>{result.mti.function} - {getMtiFunctionDescription(result.mti.function)}</TableCell>
+                <TableCell>
+                  {result.mti.function} -{" "}
+                  {getMtiFunctionDescription(result.mti.function)}
+                </TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium">Origin</TableCell>
-                <TableCell>{result.mti.origin} - {getMtiOriginDescription(result.mti.origin)}</TableCell>
+                <TableCell>
+                  {result.mti.origin} -{" "}
+                  {getMtiOriginDescription(result.mti.origin)}
+                </TableCell>
               </TableRow>
             </TableBody>
           </Table>
@@ -118,7 +119,7 @@ export function IsoDisplay({ result }: IsoDisplayProps): JSX.Element {
                   {result.bitmap.primary}
                 </div>
               </div>
-              
+
               {result.bitmap.secondary && (
                 <div>
                   <h4 className="text-sm font-medium mb-1">Secondary Bitmap</h4>
@@ -128,11 +129,11 @@ export function IsoDisplay({ result }: IsoDisplayProps): JSX.Element {
                 </div>
               )}
             </div>
-            
+
             <div>
               <h4 className="text-sm font-medium mb-1">Present Fields</h4>
               <div className="flex flex-wrap gap-1">
-                {result.bitmap.presentFields.map(fieldId => (
+                {result.bitmap.presentFields.map((fieldId) => (
                   <Badge key={fieldId} variant="outline">
                     {fieldId}
                   </Badge>
@@ -182,9 +183,7 @@ function FieldAccordionItem({ field }: FieldAccordionItemProps): JSX.Element {
           <Badge variant="outline" className="mr-2">
             {field.id}
           </Badge>
-          <span>
-            {field.definition?.name || `Field ${field.id}`}
-          </span>
+          <span>{field.definition?.name || `Field ${field.id}`}</span>
         </div>
       </AccordionTrigger>
       <AccordionContent>
@@ -196,7 +195,7 @@ function FieldAccordionItem({ field }: FieldAccordionItemProps): JSX.Element {
               {field.value}
             </div>
           </div>
-          
+
           {/* Length indicator if present */}
           {field.lengthIndicator && (
             <div>
@@ -206,7 +205,7 @@ function FieldAccordionItem({ field }: FieldAccordionItemProps): JSX.Element {
               </div>
             </div>
           )}
-          
+
           {/* Field definition if available */}
           {field.definition && (
             <div className="space-y-1">
@@ -215,24 +214,37 @@ function FieldAccordionItem({ field }: FieldAccordionItemProps): JSX.Element {
                 <TableBody className="text-xs">
                   <TableRow>
                     <TableCell className="font-medium py-1.5">Format</TableCell>
-                    <TableCell className="py-1.5">{field.definition.format}</TableCell>
+                    <TableCell className="py-1.5">
+                      {field.definition.format}
+                    </TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell className="font-medium py-1.5">Length Type</TableCell>
-                    <TableCell className="py-1.5">{field.definition.lengthType}</TableCell>
+                    <TableCell className="font-medium py-1.5">
+                      Length Type
+                    </TableCell>
+                    <TableCell className="py-1.5">
+                      {field.definition.lengthType}
+                    </TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell className="font-medium py-1.5">Length</TableCell>
                     <TableCell className="py-1.5">
-                      {field.definition.lengthType === "fixed" 
-                        ? field.definition.length 
-                        : `${field.definition.minLength || 1}-${field.definition.maxLength || field.definition.length}`}
+                      {field.definition.lengthType === "fixed"
+                        ? field.definition.length
+                        : `${field.definition.minLength || 1}-${
+                            field.definition.maxLength ||
+                            field.definition.length
+                          }`}
                     </TableCell>
                   </TableRow>
                   {field.definition.description && (
                     <TableRow>
-                      <TableCell className="font-medium py-1.5">Description</TableCell>
-                      <TableCell className="py-1.5">{field.definition.description}</TableCell>
+                      <TableCell className="font-medium py-1.5">
+                        Description
+                      </TableCell>
+                      <TableCell className="py-1.5">
+                        {field.definition.description}
+                      </TableCell>
                     </TableRow>
                   )}
                 </TableBody>
@@ -248,48 +260,81 @@ function FieldAccordionItem({ field }: FieldAccordionItemProps): JSX.Element {
 // Helper functions for MTI descriptions
 function getMtiClassDescription(classCode: string): string {
   switch (classCode) {
-    case "0": return "Authorization";
-    case "1": return "Financial";
-    case "2": return "File Actions";
-    case "3": return "File Update";
-    case "4": return "Reversal";
-    case "5": return "Reconciliation";
-    case "6": return "Administrative";
-    case "7": return "Fee Collection";
-    case "8": return "Network Management";
-    case "9": return "Reserved for ISO use";
-    default: return "Unknown";
+    case "0":
+      return "Authorization";
+    case "1":
+      return "Financial";
+    case "2":
+      return "File Actions";
+    case "3":
+      return "File Update";
+    case "4":
+      return "Reversal";
+    case "5":
+      return "Reconciliation";
+    case "6":
+      return "Administrative";
+    case "7":
+      return "Fee Collection";
+    case "8":
+      return "Network Management";
+    case "9":
+      return "Reserved for ISO use";
+    default:
+      return "Unknown";
   }
 }
 
 function getMtiFunctionDescription(functionCode: string): string {
   switch (functionCode) {
-    case "0": return "Request";
-    case "1": return "Request Response";
-    case "2": return "Advice";
-    case "3": return "Advice Response";
-    case "4": return "Notification";
-    case "5": return "Notification Acknowledgement";
-    case "6": return "Instruction";
-    case "7": return "Instruction Acknowledgement";
-    case "8": return "Reserved for ISO use";
-    case "9": return "Reserved for ISO use";
-    default: return "Unknown";
+    case "0":
+      return "Request";
+    case "1":
+      return "Request Response";
+    case "2":
+      return "Advice";
+    case "3":
+      return "Advice Response";
+    case "4":
+      return "Notification";
+    case "5":
+      return "Notification Acknowledgement";
+    case "6":
+      return "Instruction";
+    case "7":
+      return "Instruction Acknowledgement";
+    case "8":
+      return "Reserved for ISO use";
+    case "9":
+      return "Reserved for ISO use";
+    default:
+      return "Unknown";
   }
 }
 
 function getMtiOriginDescription(originCode: string): string {
   switch (originCode) {
-    case "0": return "Acquirer";
-    case "1": return "Acquirer Repeat";
-    case "2": return "Issuer";
-    case "3": return "Issuer Repeat";
-    case "4": return "Other";
-    case "5": return "Other Repeat";
-    case "6": return "Reserved for ISO use";
-    case "7": return "Reserved for ISO use";
-    case "8": return "Reserved for ISO use";
-    case "9": return "Reserved for ISO use";
-    default: return "Unknown";
+    case "0":
+      return "Acquirer";
+    case "1":
+      return "Acquirer Repeat";
+    case "2":
+      return "Issuer";
+    case "3":
+      return "Issuer Repeat";
+    case "4":
+      return "Other";
+    case "5":
+      return "Other Repeat";
+    case "6":
+      return "Reserved for ISO use";
+    case "7":
+      return "Reserved for ISO use";
+    case "8":
+      return "Reserved for ISO use";
+    case "9":
+      return "Reserved for ISO use";
+    default:
+      return "Unknown";
   }
 }
