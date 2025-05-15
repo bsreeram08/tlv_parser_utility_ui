@@ -1,7 +1,7 @@
 import { TlvViewer } from "@/components/ui/tlv-viewer/tlv-viewer";
 import { IsoViewer } from "@/components/ui/iso-builder/iso-viewer";
-import { CustomTagManager } from "@/components/ui/custom-tags";
-import { SimplifiedTlvComparison } from "@/components/ui/tlv-comparison";
+import { CustomTagManager } from "@/components/ui/custom-tags/custom-tag-manager";
+import { TlvComparison } from "@/components/ui/tlv-comparison/tlv-comparison";
 import { MainLayout } from "@/components/layouts/main-layout";
 import { Toaster } from "sonner";
 import { useState } from "react";
@@ -31,7 +31,7 @@ function App() {
       case "custom-tags":
         return <CustomTagManager />;
       case "tlv-comparison":
-        return <SimplifiedTlvComparison />;
+        return <TlvComparison />;
       case "iso8583":
         return <IsoViewer />;
       case "crypto":

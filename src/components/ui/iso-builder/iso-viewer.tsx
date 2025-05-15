@@ -139,7 +139,7 @@ export function IsoViewer(): JSX.Element {
 
   return (
     <>
-      <Card className="w-full max-w-4xl mx-auto">
+      <Card className="w-full max-w-5xl mx-auto">
         <CardHeader>
           <CardTitle>ISO 8583 Message Parser</CardTitle>
           <CardDescription>

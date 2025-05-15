@@ -42,6 +42,7 @@ export function parseTlv(
   hexString: string,
   options: TlvParsingOptions = DEFAULT_OPTIONS
 ): TlvParsingResult {
+  console.log({ hexString, options });
   // Normalize input - remove spaces and convert to uppercase
   const normalizedHex = normalizeHexString(hexString);
 
@@ -117,13 +118,15 @@ function parseElement(
 
   // Get additional information about the tag
   const tagInfo = getTagInfo(tagId);
-  
+
   // Check if this is an unknown tag
   const isUnknownTag = !tagInfo;
-  
+
   // If we should ignore unknown tags completely, stop processing this element
   if (isUnknownTag && options.ignoreUnknownTags) {
-    throw new Error(`Unknown tag: ${tagId} at position ${startPos} (ignored by configuration)`);
+    throw new Error(
+      `Unknown tag: ${tagId} at position ${startPos} (ignored by configuration)`
+    );
   }
 
   // Parse the length field
@@ -158,14 +161,18 @@ function parseElement(
       description: `Nested TLV container (${tagId})`,
       format: TagFormat.CONSTRUCTED,
       class: TagClass.APPLICATION,
-      isPropriety: true
+      isPropriety: true,
     };
-  } else if (isForceConstructed && tagInfo && tagInfo.format !== TagFormat.CONSTRUCTED) {
+  } else if (
+    isForceConstructed &&
+    tagInfo &&
+    tagInfo.format !== TagFormat.CONSTRUCTED
+  ) {
     // If tag exists but isn't constructed, create a modified version that is constructed
     effectiveTagInfo = {
       ...tagInfo,
       format: TagFormat.CONSTRUCTED,
-      description: `${tagInfo.description} (Treated as nested TLV container)`
+      description: `${tagInfo.description} (Treated as nested TLV container)`,
     };
   }
 
@@ -183,7 +190,8 @@ function parseElement(
   // Parse constructed tags recursively if enabled
   if (
     options.parseConstructed &&
-    (isForceConstructed || (tagInfo && tagInfo.format === TagFormat.CONSTRUCTED))
+    (isForceConstructed ||
+      (tagInfo && tagInfo.format === TagFormat.CONSTRUCTED))
   ) {
     try {
       const constructedResult = parseTlv(value, options);

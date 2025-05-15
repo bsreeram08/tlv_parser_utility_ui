@@ -6,6 +6,7 @@
  */
 
 import { useState, type JSX } from "react";
+import { sanitizeSelectValues } from "@/utils/select-helpers";
 import { type TlvElement, type TlvParsingResult } from "@/types/tlv";
 import {
   Card,
@@ -48,13 +49,19 @@ import { TagActionsMenu } from "@/components/ui/tlv-tags/tag-actions-menu";
 interface CompactTlvDisplayProps {
   result: TlvParsingResult | null;
   onRefresh?: () => void;
+  expandAll?: boolean;
 }
 
 export function CompactTlvDisplay({
   result,
   onRefresh,
+  expandAll: externalExpandAll,
 }: CompactTlvDisplayProps): JSX.Element {
-  const [expandAll, setExpandAll] = useState(false);
+  const [internalExpandAll, setInternalExpandAll] = useState(false);
+
+  // Use external expandAll if provided, otherwise use internal state
+  const expandAll =
+    externalExpandAll !== undefined ? externalExpandAll : internalExpandAll;
 
   if (!result) {
     return (
@@ -77,18 +84,20 @@ export function CompactTlvDisplay({
       <CardHeader className="pb-2">
         <CardTitle className="text-lg flex items-center justify-between">
           TLV Data
-          <Button
-            variant="outline"
-            className="mt-2"
-            onClick={() => setExpandAll(!expandAll)}
-          >
-            {expandAll ? "Collapse All" : "Expand All"}
-            {expandAll ? (
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            ) : (
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            )}
-          </Button>
+          {externalExpandAll === undefined && (
+            <Button
+              variant="outline"
+              className="mt-2"
+              onClick={() => setInternalExpandAll(!internalExpandAll)}
+            >
+              {expandAll ? "Collapse All" : "Expand All"}
+              {expandAll ? (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              )}
+            </Button>
+          )}
         </CardTitle>
         <CardDescription>
           {result.elements.length} tag{result.elements.length !== 1 ? "s" : ""}{" "}
@@ -145,9 +154,12 @@ function CompactTlvElement({
 
   // Create a custom tag definition from this unknown tag
   const handleCreateCustomTag = async (tagParams: CustomTagCreationParams) => {
+    // Sanitize tag params to prevent empty string values
+    const sanitizedParams = sanitizeSelectValues(tagParams);
+
     // Add the custom tag to the database
     await db.addCustomTag({
-      ...tagParams,
+      ...sanitizedParams,
       created: new Date(),
     });
 
@@ -193,13 +205,41 @@ function CompactTlvElement({
   };
 
   return (
-    <div className="rounded border">
+    <div className="rounded border relative">
+      {/* Position the actions menu outside the button to avoid nesting issues */}
+      <div className="absolute top-2 right-2 z-10 flex items-center space-x-1">
+        {element.isUnknown && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 rounded-full p-0 hover:bg-muted/80"
+                  onClick={() => setDefineTagOpen(true)}
+                >
+                  <HelpCircle className="h-4 w-4 text-warning" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p>Define Custom Tag</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+        <TagActionsMenu
+          tag={element.tag}
+          value={element.value}
+          path={path || element.tag}
+        />
+      </div>
+
       <Collapsible open={isOpen} onOpenChange={setIsOpen} className="">
         <CollapsibleTrigger asChild>
           <Button
             variant="ghost"
             className={cn(
-              "flex w-full items-start justify-between rounded-none text-left",
+              "flex w-full items-start justify-between pr-10 rounded-none text-left",
               element.isUnknown
                 ? "bg-muted/60 hover:bg-muted/80"
                 : "hover:bg-muted",
@@ -228,31 +268,6 @@ function CompactTlvElement({
               <div className="truncate font-medium">
                 {element.tagInfo?.name || "Unknown Tag"}
               </div>
-
-              {element.isUnknown && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 rounded-full p-0 hover:bg-muted/80"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDefineTagOpen(true);
-                        }}
-                      >
-                        <HelpCircle className="h-4 w-4 text-warning" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      <p>Define Custom Tag</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-
-              {/* Add tag actions menu */}
             </div>
 
             <div className="flex items-center text-xs text-muted-foreground">
@@ -265,23 +280,18 @@ function CompactTlvElement({
                 {element.value ? element.value : "<empty>"}
               </div>
             </div>
-            <TagActionsMenu
-              tag={element.tag}
-              value={element.value}
-              path={path || element.tag}
-            />
           </Button>
         </CollapsibleTrigger>
 
-        <CollapsibleContent>
+        <CollapsibleContent className="p-3 pt-0 border-t">
           <div className="p-3 pt-0 border-t">
+            {" "}
             {/* Tag description */}
             {element.tagInfo && (
               <div className="text-sm mt-3 text-muted-foreground">
                 {element.tagInfo.description}
               </div>
             )}
-
             {/* Value display with tabs */}
             {element.length > 0 && (
               <div className="mt-3">
@@ -342,10 +352,8 @@ function CompactTlvElement({
                 </Tabs>
               </div>
             )}
-
             {/* Tag-specific UI component */}
             {renderTagSpecificUI()}
-
             {/* Nested elements */}
             {element.children && element.children.length > 0 && (
               <div className="mt-4">

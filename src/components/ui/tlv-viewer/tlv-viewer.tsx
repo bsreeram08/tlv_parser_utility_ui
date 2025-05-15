@@ -6,6 +6,7 @@
  */
 
 import { useState, type JSX, useCallback } from "react";
+import { sanitizeSelectValues } from "@/utils/select-helpers";
 import { TlvInput } from "./tlv-input";
 import { CompactTlvDisplay } from "./compact-tlv-display";
 import { type TlvParsingResult, parseTlv, formatTlvAsJson } from "@/utils/tlv";
@@ -27,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Save, FolderOpen, HelpCircle } from "lucide-react";
+import { base64ToBase16 } from "@/utils/base64-hex";
 
 // Example TLV data for demonstration
 const EXAMPLE_TLV_DATA =
@@ -112,12 +114,17 @@ export function TlvViewer(): JSX.Element {
   /**
    * Load a saved TLV test
    */
-  const handleLoad = (tlvData: string, _options?: Record<string, unknown>) => {
+  const handleLoad = (tlvData: string, options?: Record<string, unknown>) => {
+    // Sanitize any options that might contain empty strings
+    const safeOptions = options ? sanitizeSelectValues(options) : undefined;
+
     setInputHex(tlvData);
     handleParse(tlvData);
-    
+
     // We don't need to update lastAccessed timestamp here
     // as it's already handled in the TestsDrawer component
+
+    console.log("Loaded TLV data with safe options:", safeOptions);
   };
 
   // Register keyboard shortcuts
@@ -219,7 +226,7 @@ export function TlvViewer(): JSX.Element {
 
   return (
     <>
-      <Card className="w-full max-w-4xl mx-auto">
+      <Card className="w-full mx-auto">
         <CardHeader>
           <div className="flex justify-between items-center">
             <div>
@@ -268,7 +275,17 @@ export function TlvViewer(): JSX.Element {
             </TabsList>
 
             <TabsContent value="viewer" className="mt-0">
-              <TlvInput onParse={handleParse} initialValue={inputHex} />
+              <TlvInput
+                onParse={(v) => {
+                  if (v.format === "base64") {
+                    const hex = base64ToBase16(v.value);
+                    handleParse(hex);
+                  } else {
+                    handleParse(v.value);
+                  }
+                }}
+                initialValue={inputHex}
+              />
             </TabsContent>
 
             <TabsContent value="results" className="mt-0">

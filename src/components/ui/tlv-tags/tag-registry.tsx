@@ -1,4 +1,5 @@
 import { type ReactNode } from "react";
+import { sanitizeSelectValues } from "@/utils/select-helpers";
 import { TerminalCapabilitiesTag } from "./terminal-capabilities";
 
 // Interface for tag renderer props
@@ -32,7 +33,16 @@ const tagRegistry: Record<string, TagRenderer> = {
  * @returns Tag renderer or undefined if no custom renderer exists
  */
 export function getTagRenderer(tag: string): TagRenderer | undefined {
-  return tagRegistry[tag];
+  const renderer = tagRegistry[tag];
+  
+  if (!renderer) return undefined;
+  
+  // Return a wrapper that sanitizes props before rendering
+  return (props) => {
+    // Sanitize props to avoid empty strings in SelectItem components
+    const sanitizedProps = sanitizeSelectValues(props);
+    return renderer(sanitizedProps);
+  };
 }
 
 /**

@@ -1,6 +1,7 @@
 import Dexie from "dexie";
 import type { Table } from "dexie";
 import type { CustomTagDefinition } from "@/types/custom-tag";
+import type { SavedTlvComparison } from "@/types/tlv-comparison";
 
 // Define the saved data structure for TLV tests
 export interface SavedTlvTest {
@@ -39,6 +40,7 @@ export class PaymentUtilsDB extends Dexie {
   tlvTests!: Table<SavedTlvTest>;
   isoTests!: Table<SavedIsoTest>;
   customTags!: Table<CustomTagDefinition>;
+  tlvComparisons!: Table<SavedTlvComparison>;
 
   constructor() {
     super("paymentUtilsDB");
@@ -56,6 +58,11 @@ export class PaymentUtilsDB extends Dexie {
     this.version(3).stores({
       tlvTests: "++id, date, name, *tags, category, favorite, lastAccessed, source, version",
       isoTests: "++id, date, name, version, *tags, category, favorite, lastAccessed, source, messageType"
+    });
+    
+    // Add TLV comparisons table in version 4
+    this.version(4).stores({
+      tlvComparisons: "++id, date, name, *tags, category, favorite, lastAccessed, source"
     });
   }
 
@@ -139,6 +146,36 @@ export class PaymentUtilsDB extends Dexie {
     return await this.customTags
       .filter(tag => tag.name.toLowerCase().includes(query.toLowerCase()))
       .toArray();
+  }
+  
+  // TLV Comparison methods
+  
+  // Save a TLV comparison
+  async saveTlvComparison(comparison: SavedTlvComparison): Promise<number> {
+    return await this.tlvComparisons.add({
+      ...comparison,
+      date: new Date(),
+    });
+  }
+  
+  // Get all TLV comparisons
+  async getTlvComparisons(): Promise<SavedTlvComparison[]> {
+    return await this.tlvComparisons.orderBy("date").reverse().toArray();
+  }
+  
+  // Get a TLV comparison by ID
+  async getTlvComparison(id: number): Promise<SavedTlvComparison | undefined> {
+    return await this.tlvComparisons.get(id);
+  }
+  
+  // Delete a TLV comparison
+  async deleteTlvComparison(id: number): Promise<void> {
+    return await this.tlvComparisons.delete(id);
+  }
+  
+  // Update last accessed timestamp for TLV comparison
+  async updateTlvComparisonAccess(id: number): Promise<number> {
+    return await this.tlvComparisons.update(id, { lastAccessed: new Date() });
   }
 }
 

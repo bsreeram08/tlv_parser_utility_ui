@@ -1,643 +1,559 @@
 /**
- * TLV Comparison Tool
+ * TLV Comparison Component
  *
- * A component for comparing two TLV data streams side by side,
- * highlighting differences, and generating comparison reports.
+ * A component that provides side-by-side comparison of two TLV data streams
  */
 
-import { useState, useMemo, type JSX } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { useState, type JSX } from "react";
+
+// Define TLV format type
+type TlvFormat = "hex" | "base64" | "unknown";
+
+import { parseTlv, formatTlvAsJson, type TlvParsingResult } from "@/utils/tlv";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
-import { parseTlv, getTagInfo } from "@/utils/tlv";
-import { type TlvElement, type TlvParsingResult } from "@/types/tlv";
+
 import { toast } from "sonner";
-import { FileDown, Copy } from "lucide-react";
-import { EnhancedTestsDrawer } from "@/components/ui/enhanced-tests-drawer";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import {
+  ArrowLeftRight,
+  Copy,
+  Save,
+  RefreshCw,
+  ArrowUpFromLine,
+} from "lucide-react";
+import { CompactTlvDisplay } from "../tlv-viewer/compact-tlv-display";
 
-// Diff status for a TLV element
-type DiffStatus = "added" | "removed" | "modified" | "unchanged";
+// Example TLV data for demonstration
+const LEFT_EXAMPLE_TLV_DATA =
+  "9F2608C1C2C3C4C5C6C7C89F2701009F360200019F10120110A0000F040000000000000000000000FF9F3303E0F8C89505008000E000";
 
-// Enhanced TLV element with diff status
-interface TlvElementWithDiff extends TlvElement {
-  diffStatus: DiffStatus;
-  differences?: {
-    field: string;
-    leftValue: string;
-    rightValue: string;
-  }[];
-}
+const RIGHT_EXAMPLE_TLV_DATA =
+  "9F2608A1B2C3D4E5F6A7B89F2701019F360200039F10120110A0000F040000000000000000000000FF9F3303E0F0C89505008004E000";
 
-// Result of comparing two TLV structures
-interface TlvComparisonResult {
-  leftOnly: TlvElementWithDiff[];
-  rightOnly: TlvElementWithDiff[];
-  modified: TlvElementWithDiff[];
-  unchanged: TlvElementWithDiff[];
-  differencesCount: number;
-  totalElementsCompared: number;
-}
-
-/**
- * Compare two TLV parsing results and return the differences
- */
-function compareTlvResults(
-  left: TlvParsingResult | null,
-  right: TlvParsingResult | null
-): TlvComparisonResult {
-  // Initialize comparison result
-  const result: TlvComparisonResult = {
-    leftOnly: [],
-    rightOnly: [],
-    modified: [],
-    unchanged: [],
-    differencesCount: 0,
-    totalElementsCompared: 0,
-  };
-
-  if (!left || !right) {
-    return result;
-  }
-
-  // Create maps for quicker lookups
-  const leftMap = new Map<string, TlvElement>();
-  const rightMap = new Map<string, TlvElement>();
-
-  // Populate maps
-  left.elements.forEach((element) => {
-    leftMap.set(element.tag, element);
-  });
-
-  right.elements.forEach((element) => {
-    rightMap.set(element.tag, element);
-  });
-
-  // Find elements in left but not in right (or modified)
-  leftMap.forEach((leftElement, tag) => {
-    result.totalElementsCompared++;
-
-    if (!rightMap.has(tag)) {
-      // Element exists only in left
-      result.leftOnly.push({
-        ...leftElement,
-        diffStatus: "removed",
-      });
-      result.differencesCount++;
-    } else {
-      // Element exists in both, check if modified
-      const rightElement = rightMap.get(tag)!;
-      if (leftElement.value !== rightElement.value) {
-        // Values are different
-        const differences = [
-          {
-            field: "value",
-            leftValue: leftElement.value,
-            rightValue: rightElement.value,
-          },
-        ];
-
-        result.modified.push({
-          ...leftElement,
-          diffStatus: "modified",
-          differences,
-        });
-        result.differencesCount++;
-      } else {
-        // No differences
-        result.unchanged.push({
-          ...leftElement,
-          diffStatus: "unchanged",
-        });
-      }
-    }
-  });
-
-  // Find elements in right but not in left
-  rightMap.forEach((rightElement, tag) => {
-    if (!leftMap.has(tag)) {
-      result.totalElementsCompared++;
-      result.rightOnly.push({
-        ...rightElement,
-        diffStatus: "added",
-      });
-      result.differencesCount++;
-    }
-  });
-
-  return result;
-}
-
-/**
- * Generate a textual report of the comparison
- */
-function generateComparisonReport(
-  comparison: TlvComparisonResult,
-  leftLabel: string = "Source A",
-  rightLabel: string = "Source B"
-): string {
-  const lines: string[] = [];
-
-  // Header
-  lines.push(`# TLV Comparison Report`);
-  lines.push(`Generated: ${new Date().toLocaleString()}`);
-  lines.push(`${leftLabel} vs ${rightLabel}`);
-  lines.push(``);
-
-  // Summary
-  lines.push(`## Summary`);
-  lines.push(`- Total elements compared: ${comparison.totalElementsCompared}`);
-  lines.push(`- Differences found: ${comparison.differencesCount}`);
-  lines.push(`- Elements only in ${leftLabel}: ${comparison.leftOnly.length}`);
-  lines.push(
-    `- Elements only in ${rightLabel}: ${comparison.rightOnly.length}`
-  );
-  lines.push(`- Modified elements: ${comparison.modified.length}`);
-  lines.push(`- Unchanged elements: ${comparison.unchanged.length}`);
-  lines.push(``);
-
-  // Elements only in left
-  if (comparison.leftOnly.length > 0) {
-    lines.push(`## Elements only in ${leftLabel}`);
-    comparison.leftOnly.forEach((element) => {
-      const tagInfo = getTagInfo(element.tag);
-      lines.push(`- Tag: ${element.tag} (${tagInfo?.name || "Unknown Tag"})`);
-      lines.push(`  Value: ${element.value}`);
-      if (tagInfo) {
-        lines.push(`  Description: ${tagInfo.description || "No description"}`);
-      }
-      lines.push(``);
-    });
-  }
-
-  // Elements only in right
-  if (comparison.rightOnly.length > 0) {
-    lines.push(`## Elements only in ${rightLabel}`);
-    comparison.rightOnly.forEach((element) => {
-      const tagInfo = getTagInfo(element.tag);
-      lines.push(`- Tag: ${element.tag} (${tagInfo?.name || "Unknown Tag"})`);
-      lines.push(`  Value: ${element.value}`);
-      if (tagInfo) {
-        lines.push(`  Description: ${tagInfo.description || "No description"}`);
-      }
-      lines.push(``);
-    });
-  }
-
-  // Modified elements
-  if (comparison.modified.length > 0) {
-    lines.push(`## Modified Elements`);
-    comparison.modified.forEach((element) => {
-      const tagInfo = getTagInfo(element.tag);
-      lines.push(`- Tag: ${element.tag} (${tagInfo?.name || "Unknown Tag"})`);
-      if (element.differences) {
-        element.differences.forEach((diff) => {
-          lines.push(`  ${diff.field}:`);
-          lines.push(`    ${leftLabel}: ${diff.leftValue}`);
-          lines.push(`    ${rightLabel}: ${diff.rightValue}`);
-        });
-      }
-      if (tagInfo) {
-        lines.push(`  Description: ${tagInfo.description || "No description"}`);
-      }
-      lines.push(``);
-    });
-  }
-
-  return lines.join("\n");
-}
-
-/**
- * Download text as a file
- */
-function downloadTextAsFile(content: string, filename: string): void {
-  const blob = new Blob([content], { type: "text/plain" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-/**
- * Component for displaying a single TLV element with diff highlighting
- */
-function TlvDiffElement({
-  element,
-}: {
-  element: TlvElementWithDiff;
-}): JSX.Element {
-  const tagInfo = getTagInfo(element.tag);
-
-  // Determine badge styling based on diff status
-  const badgeVariant = (() => {
-    switch (element.diffStatus) {
-      case "added":
-        return "secondary";
-      case "removed":
-        return "destructive";
-      case "modified":
-        return "outline";
-      default:
-        return "secondary";
-    }
-  })();
-
-  // Determine label based on diff status
-  const statusLabel = (() => {
-    switch (element.diffStatus) {
-      case "added":
-        return "Added";
-      case "removed":
-        return "Removed";
-      case "modified":
-        return "Modified";
-      default:
-        return "Unchanged";
-    }
-  })();
-
-  return (
-    <div
-      className={`rounded-md border p-4 mb-2 ${
-        element.diffStatus === "unchanged" ? "opacity-70" : "border-2"
-      } ${
-        element.diffStatus === "added"
-          ? "border-green-500"
-          : element.diffStatus === "removed"
-          ? "border-red-500"
-          : element.diffStatus === "modified"
-          ? "border-amber-500"
-          : ""
-      }`}
-    >
-      <div className="flex justify-between items-start mb-1">
-        <div>
-          <span className="font-mono font-bold">{element.tag}</span>
-          {tagInfo && <span className="ml-2 text-sm">{tagInfo.name}</span>}
-        </div>
-        <Badge variant={badgeVariant}>{statusLabel}</Badge>
-      </div>
-
-      <div className="mt-2">
-        <div className="text-sm font-semibold text-muted-foreground">
-          Value:
-        </div>
-        <div className="font-mono text-xs overflow-auto break-all">
-          {element.value}
-        </div>
-      </div>
-
-      {element.differences && (
-        <div className="mt-2 border-t pt-2">
-          <div className="text-sm font-semibold text-warning">Differences:</div>
-          {element.differences.map((diff, idx) => (
-            <div key={idx} className="text-xs mt-1">
-              <div className="font-semibold">{diff.field}:</div>
-              <div className="pl-2 border-l-2 border-red-300">
-                - {diff.leftValue}
-              </div>
-              <div className="pl-2 border-l-2 border-green-300">
-                + {diff.rightValue}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * Main TLV Comparison Tool component
- */
 export function TlvComparison(): JSX.Element {
-  const [leftInput, setLeftInput] = useState("");
-  const [rightInput, setRightInput] = useState("");
-  const [leftLabel, setLeftLabel] = useState("Source A");
-  const [rightLabel, setRightLabel] = useState("Source B");
-  const [activeTab, setActiveTab] = useState("comparison");
-  const [showUnchanged, setShowUnchanged] = useState(false);
+  // State for left side
+  const [leftParseResult, setLeftParseResult] =
+    useState<TlvParsingResult | null>(null);
+  const [leftInputHex, setLeftInputHex] = useState<string>("");
+  const [leftName, setLeftName] = useState<string>("Source TLV");
+  const [leftFormat, setLeftFormat] = useState<TlvFormat>("unknown");
 
-  // Parse TLV data
-  const leftResult = useMemo(() => {
+  // State for right side
+  const [rightParseResult, setRightParseResult] =
+    useState<TlvParsingResult | null>(null);
+  const [rightInputHex, setRightInputHex] = useState<string>("");
+  const [rightName, setRightName] = useState<string>("Target TLV");
+  const [rightFormat, setRightFormat] = useState<TlvFormat>("unknown");
+
+  // Shared state
+  const [activeTab, setActiveTab] = useState<string>("input");
+  const [showUnknownTags, setShowUnknownTags] = useState(true);
+  const [highlightDifferences, setHighlightDifferences] = useState(true);
+  const [expandAll, setExpandAll] = useState(false);
+
+  /**
+   * Check if a string is a non-empty string
+   */
+  const isNonEmptyString = (value: unknown): boolean => {
+    return typeof value === "string" && value.length > 0;
+  };
+
+  /**
+   * Check if a string is valid hex (even length and only hex characters)
+   */
+  const isValidHex = (value: string): boolean => {
+    return (
+      /^[0-9A-Fa-f]*$/.test(value) && value.length % 2 === 0 && value.length > 0
+    );
+  };
+
+  /**
+   * Check if a string might be Base64
+   */
+  const mightBeBase64 = (value: string): boolean => {
+    return /^[A-Za-z0-9+/]*={0,2}$/.test(value) && value.length > 0;
+  };
+
+  /**
+   * Convert Base64 to Hex
+   */
+  const convertBase64ToHex = (base64: string): string => {
     try {
-      return leftInput
-        ? parseTlv(leftInput, { ignoreUnknownTags: true })
-        : null;
-    } catch (error) {
-      return null;
-    }
-  }, [leftInput]);
+      if (!isNonEmptyString(base64)) {
+        throw new Error("Invalid Base64 input");
+      }
 
-  const rightResult = useMemo(() => {
+      // Get binary string from base64
+      const binaryString = window.atob(base64);
+
+      // Convert to hex
+      let hex = "";
+      for (let i = 0; i < binaryString.length; i++) {
+        const byte = binaryString.charCodeAt(i);
+        hex += byte.toString(16).padStart(2, "0").toUpperCase();
+      }
+
+      return hex;
+    } catch (e) {
+      console.error("Base64 to hex conversion failed:", e);
+      return "";
+    }
+  };
+
+  /**
+   * Detect format without setting error
+   */
+  const detectFormat = (value: string): TlvFormat => {
+    // Safety check for non-string values
+    if (!isNonEmptyString(value)) {
+      return "unknown";
+    }
+
+    // Now that we know it's a string, we can safely use string methods
+    const trimmedValue = value.trim();
+    if (trimmedValue === "") {
+      return "unknown";
+    }
+
+    // Check for hex format
+    if (isValidHex(trimmedValue)) {
+      return "hex";
+    }
+
+    // Check for Base64 format
+    if (mightBeBase64(trimmedValue)) {
+      try {
+        // Attempt to decode to verify it's valid Base64
+        window.atob(trimmedValue);
+        return "base64";
+      } catch (e) {
+        // Not valid Base64
+      }
+    }
+
+    return "unknown";
+  };
+
+  /**
+   * Handle parsing of left TLV data
+   */
+  const handleLeftParse = (data: {
+    value: string;
+    format: TlvFormat;
+  }): void => {
+    let hexString = data.value;
+    const format = data.format !== "unknown" ? data.format : detectFormat(data.value);
+    
+    // Convert base64 to hex if needed
+    if (format === "base64") {
+      hexString = convertBase64ToHex(data.value);
+    }
+    
+    setLeftInputHex(data.value);
+    setLeftFormat(format);
+
     try {
-      return rightInput
-        ? parseTlv(rightInput, { ignoreUnknownTags: true })
-        : null;
+      // Parse the input hex string
+      const result = parseTlv(hexString);
+
+      // Update the state with the parse result
+      setLeftParseResult(result);
+
+      // Show toast notifications
+      if (result.errors.length > 0) {
+        toast.error(
+          `Parsing completed with ${result.errors.length} error${
+            result.errors.length === 1 ? "" : "s"
+          }`
+        );
+      } else {
+        toast.success(
+          `Successfully parsed ${result.elements.length} TLV element${
+            result.elements.length === 1 ? "" : "s"
+          }`
+        );
+      }
+
+      // If we have both sides parsed, switch to results tab
+      if (rightParseResult) {
+        setActiveTab("results");
+      }
     } catch (error) {
-      return null;
+      toast.error(
+        "Failed to parse left TLV data: " +
+          (error instanceof Error ? error.message : String(error))
+      );
     }
-  }, [rightInput]);
-
-  // Compare the TLV results
-  const comparisonResult = useMemo(() => {
-    return compareTlvResults(leftResult, rightResult);
-  }, [leftResult, rightResult]);
-
-  // Generate comparison report
-  const report = useMemo(() => {
-    return generateComparisonReport(comparisonResult, leftLabel, rightLabel);
-  }, [comparisonResult, leftLabel, rightLabel]);
-
-  // Handle copying report to clipboard
-  const handleCopyReport = (): void => {
-    navigator.clipboard
-      .writeText(report)
-      .then(() => toast.success("Report copied to clipboard"))
-      .catch(() => toast.error("Failed to copy report"));
   };
 
-  // Handle downloading report
-  const handleDownloadReport = (): void => {
-    const timestamp = new Date().toISOString().replace(/:/g, "-").split(".")[0];
-    downloadTextAsFile(report, `tlv-comparison-report-${timestamp}.txt`);
-    toast.success("Report downloaded");
+  /**
+   * Handle parsing of right TLV data
+   */
+  const handleRightParse = (data: {
+    value: string;
+    format: TlvFormat;
+  }): void => {
+    let hexString = data.value;
+    const format = data.format !== "unknown" ? data.format : detectFormat(data.value);
+    
+    // Convert base64 to hex if needed
+    if (format === "base64") {
+      hexString = convertBase64ToHex(data.value);
+    }
+    
+    setRightInputHex(data.value);
+    setRightFormat(format);
+
+    try {
+      // Parse the input hex string
+      const result = parseTlv(hexString);
+
+      // Update the state with the parse result
+      setRightParseResult(result);
+
+      // Show toast notifications
+      if (result.errors.length > 0) {
+        toast.error(
+          `Parsing completed with ${result.errors.length} error${
+            result.errors.length === 1 ? "" : "s"
+          }`
+        );
+      } else {
+        toast.success(
+          `Successfully parsed ${result.elements.length} TLV element${
+            result.elements.length === 1 ? "" : "s"
+          }`
+        );
+      }
+
+      // If we have both sides parsed, switch to results tab
+      if (leftParseResult) {
+        setActiveTab("results");
+      }
+    } catch (error) {
+      toast.error(
+        "Failed to parse right TLV data: " +
+          (error instanceof Error ? error.message : String(error))
+      );
+    }
   };
 
-  // Handle loading TLV data
-  const handleLoadLeft = (data: string): void => {
-    setLeftInput(data);
+  /**
+   * Load example data for both sides
+   */
+  const handleLoadExamples = (): void => {
+    setLeftInputHex(LEFT_EXAMPLE_TLV_DATA);
+    setRightInputHex(RIGHT_EXAMPLE_TLV_DATA);
+    setLeftFormat("hex");
+    setRightFormat("hex");
+    handleLeftParse({ value: LEFT_EXAMPLE_TLV_DATA, format: "hex" });
+    handleRightParse({ value: RIGHT_EXAMPLE_TLV_DATA, format: "hex" });
   };
 
-  const handleLoadRight = (data: string): void => {
-    setRightInput(data);
+  /**
+   * Swap left and right data
+   */
+  const handleSwapSides = (): void => {
+    const tempResult = leftParseResult;
+    const tempInput = leftInputHex;
+    const tempName = leftName;
+    const tempFormat = leftFormat;
+
+    setLeftParseResult(rightParseResult);
+    setLeftInputHex(rightInputHex);
+    setLeftName(rightName);
+    setLeftFormat(rightFormat);
+
+    setRightParseResult(tempResult);
+    setRightInputHex(tempInput);
+    setRightName(tempName);
+    setRightFormat(tempFormat);
+  };
+
+  /**
+   * Filter out unknown tags if option is disabled
+   */
+  const filterUnknownTags = (
+    result: TlvParsingResult | null
+  ): TlvParsingResult | null => {
+    if (!result || showUnknownTags) return result;
+
+    // Function to filter elements recursively
+    const filterElements = (elements: TlvParsingResult["elements"]) => {
+      return elements
+        .filter((element) => !element.isUnknown)
+        .map((element) => ({
+          ...element,
+          // Filter children recursively if they exist
+          children: element.children
+            ? filterElements(element.children)
+            : undefined,
+        }));
+    };
+
+    return {
+      ...result,
+      elements: filterElements(result.elements),
+    };
   };
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>TLV Comparison Tool</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          {/* Left input */}
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Label htmlFor="left-label">Label:</Label>
-              <Input
-                id="left-label"
-                value={leftLabel}
-                onChange={(e) => setLeftLabel(e.target.value)}
-                className="max-w-[200px]"
-              />
-              <EnhancedTestsDrawer testType="tlv" onLoad={handleLoadLeft}>
-                <Button variant="outline" size="sm" className="ml-auto">
-                  Load
-                </Button>
-              </EnhancedTestsDrawer>
-            </div>
-            <div className="flex flex-col">
-              <Label htmlFor="left-input">TLV Data:</Label>
-              <textarea
-                id="left-input"
-                className="flex min-h-[150px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-mono"
-                placeholder="Enter TLV data in hexadecimal format..."
-                value={leftInput}
-                onChange={(e) => setLeftInput(e.target.value)}
-              />
-              {leftResult && (
-                <div className="text-xs text-muted-foreground mt-1">
-                  {leftResult.elements.length} tags found
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right input */}
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Label htmlFor="right-label">Label:</Label>
-              <Input
-                id="right-label"
-                value={rightLabel}
-                onChange={(e) => setRightLabel(e.target.value)}
-                className="max-w-[200px]"
-              />
-              <EnhancedTestsDrawer testType="tlv" onLoad={handleLoadRight}>
-                <Button variant="outline" size="sm" className="ml-auto">
-                  Load
-                </Button>
-              </EnhancedTestsDrawer>
-            </div>
-            <div className="flex flex-col">
-              <Label htmlFor="right-input">TLV Data:</Label>
-              <textarea
-                id="right-input"
-                className="flex min-h-[150px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-mono"
-                placeholder="Enter TLV data in hexadecimal format..."
-                value={rightInput}
-                onChange={(e) => setRightInput(e.target.value)}
-              />
-              {rightResult && (
-                <div className="text-xs text-muted-foreground mt-1">
-                  {rightResult.elements.length} tags found
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Comparison results */}
-        {leftResult && rightResult && (
-          <div className="mt-8">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">
-                Comparison Results
-                {comparisonResult.differencesCount > 0 && (
-                  <Badge variant="destructive" className="ml-2">
-                    {comparisonResult.differencesCount} Differences
-                  </Badge>
-                )}
-                {comparisonResult.differencesCount === 0 && (
-                  <Badge variant="secondary" className="ml-2">
-                    Identical
-                  </Badge>
-                )}
-              </h3>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowUnchanged(!showUnchanged)}
-                >
-                  {showUnchanged ? "Hide" : "Show"} Unchanged Tags
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleCopyReport}>
-                  <Copy className="h-4 w-4 mr-1" /> Copy Report
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDownloadReport}
-                >
-                  <FileDown className="h-4 w-4 mr-1" /> Download Report
-                </Button>
-              </div>
-            </div>
-
-            <Tabs
-              value={activeTab}
-              onValueChange={setActiveTab}
-              className="w-full"
-            >
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="comparison">Comparison</TabsTrigger>
-                <TabsTrigger value="removed">
-                  Removed ({comparisonResult.leftOnly.length})
-                </TabsTrigger>
-                <TabsTrigger value="added">
-                  Added ({comparisonResult.rightOnly.length})
-                </TabsTrigger>
-                <TabsTrigger value="modified">
-                  Modified ({comparisonResult.modified.length})
-                </TabsTrigger>
+    <>
+      {/* Main content */}
+      <Card className="w-full shadow-md">
+        <CardHeader className="pb-2">
+          <CardTitle>TLV Comparison</CardTitle>
+          <CardDescription>
+            Compare two TLV data streams side by side to identify differences
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {/* Tabs for input and results */}
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <div className="flex justify-between items-center">
+              <TabsList>
+                <TabsTrigger value="input">Input</TabsTrigger>
+                <TabsTrigger value="results">Results</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="comparison">
-                <ScrollArea className="h-[400px] border rounded-md p-4">
-                  {comparisonResult.leftOnly.length > 0 && (
-                    <div className="mb-6">
-                      <h4 className="text-md font-semibold mb-2 border-b pb-1">
-                        Removed from {leftLabel}
-                      </h4>
-                      {comparisonResult.leftOnly.map((element, idx) => (
-                        <TlvDiffElement
-                          key={`left-${element.tag}-${idx}`}
-                          element={element}
-                        />
-                      ))}
-                    </div>
-                  )}
+              {/* Options Panel */}
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="show-unknown-tags"
+                    checked={showUnknownTags}
+                    onCheckedChange={setShowUnknownTags}
+                  />
+                  <Label htmlFor="show-unknown-tags">Show unknown tags</Label>
+                </div>
 
-                  {comparisonResult.rightOnly.length > 0 && (
-                    <div className="mb-6">
-                      <h4 className="text-md font-semibold mb-2 border-b pb-1">
-                        Added in {rightLabel}
-                      </h4>
-                      {comparisonResult.rightOnly.map((element, idx) => (
-                        <TlvDiffElement
-                          key={`right-${element.tag}-${idx}`}
-                          element={element}
-                        />
-                      ))}
-                    </div>
-                  )}
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="highlight-diff"
+                    checked={highlightDifferences}
+                    onCheckedChange={setHighlightDifferences}
+                  />
+                  <Label htmlFor="highlight-diff">Highlight differences</Label>
+                </div>
 
-                  {comparisonResult.modified.length > 0 && (
-                    <div className="mb-6">
-                      <h4 className="text-md font-semibold mb-2 border-b pb-1">
-                        Modified Tags
-                      </h4>
-                      {comparisonResult.modified.map((element, idx) => (
-                        <TlvDiffElement
-                          key={`mod-${element.tag}-${idx}`}
-                          element={element}
-                        />
-                      ))}
-                    </div>
-                  )}
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="expand-all"
+                    checked={expandAll}
+                    onCheckedChange={setExpandAll}
+                  />
+                  <Label htmlFor="expand-all">Expand all</Label>
+                </div>
 
-                  {showUnchanged && comparisonResult.unchanged.length > 0 && (
-                    <div>
-                      <h4 className="text-md font-semibold mb-2 border-b pb-1">
-                        Unchanged Tags
-                      </h4>
-                      {comparisonResult.unchanged.map((element, idx) => (
-                        <TlvDiffElement
-                          key={`unchanged-${element.tag}-${idx}`}
-                          element={element}
-                        />
-                      ))}
-                    </div>
-                  )}
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleSwapSides}
+                  title="Swap sides"
+                >
+                  <ArrowLeftRight className="h-4 w-4" />
+                </Button>
 
-                  {comparisonResult.differencesCount === 0 && (
-                    <div className="py-8 text-center">
-                      <p className="text-lg text-success">
-                        The TLV data is identical in both sources
-                      </p>
-                    </div>
-                  )}
-                </ScrollArea>
-              </TabsContent>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLoadExamples}
+                >
+                  Load Examples
+                </Button>
+              </div>
+            </div>
 
-              <TabsContent value="removed">
-                <ScrollArea className="h-[400px] border rounded-md p-4">
-                  {comparisonResult.leftOnly.length === 0 ? (
-                    <div className="py-8 text-center">
-                      <p className="text-muted-foreground">
-                        No tags were removed
-                      </p>
-                    </div>
-                  ) : (
-                    comparisonResult.leftOnly.map((element, idx) => (
-                      <TlvDiffElement
-                        key={`left-${element.tag}-${idx}`}
-                        element={element}
-                      />
-                    ))
-                  )}
-                </ScrollArea>
-              </TabsContent>
+            {/* Input Tab Content */}
+            <TabsContent value="input" className="mt-4">
+              <div className="grid grid-cols-2 gap-4">
+                {/* Left Input */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center mb-2">
+                    <Label>Source TLV</Label>
+                    {leftFormat !== "unknown" && (
+                      <Badge variant="outline" className="font-mono">
+                        {leftFormat.toUpperCase()} detected
+                      </Badge>
+                    )}
+                  </div>
+                  <textarea
+                    className="w-full min-h-[200px] p-2 font-mono text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    value={leftInputHex}
+                    onChange={(e) => {
+                      setLeftInputHex(e.target.value);
+                      setLeftFormat(detectFormat(e.target.value));
+                    }}
+                    placeholder="Enter source TLV data (hex or base64)..."
+                  />
+                </div>
 
-              <TabsContent value="added">
-                <ScrollArea className="h-[400px] border rounded-md p-4">
-                  {comparisonResult.rightOnly.length === 0 ? (
-                    <div className="py-8 text-center">
-                      <p className="text-muted-foreground">
-                        No tags were added
-                      </p>
-                    </div>
-                  ) : (
-                    comparisonResult.rightOnly.map((element, idx) => (
-                      <TlvDiffElement
-                        key={`right-${element.tag}-${idx}`}
-                        element={element}
-                      />
-                    ))
-                  )}
-                </ScrollArea>
-              </TabsContent>
+                {/* Right Input */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center mb-2">
+                    <Label>Target TLV</Label>
+                    {rightFormat !== "unknown" && (
+                      <Badge variant="outline" className="font-mono">
+                        {rightFormat.toUpperCase()} detected
+                      </Badge>
+                    )}
+                  </div>
+                  <textarea
+                    className="w-full min-h-[200px] p-2 font-mono text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    value={rightInputHex}
+                    onChange={(e) => {
+                      setRightInputHex(e.target.value);
+                      setRightFormat(detectFormat(e.target.value));
+                    }}
+                    placeholder="Enter target TLV data (hex or base64)..."
+                  />
+                </div>
+              </div>
 
-              <TabsContent value="modified">
-                <ScrollArea className="h-[400px] border rounded-md p-4">
-                  {comparisonResult.modified.length === 0 ? (
-                    <div className="py-8 text-center">
-                      <p className="text-muted-foreground">
-                        No tags were modified
-                      </p>
-                    </div>
-                  ) : (
-                    comparisonResult.modified.map((element, idx) => (
-                      <TlvDiffElement
-                        key={`mod-${element.tag}-${idx}`}
-                        element={element}
-                      />
-                    ))
-                  )}
-                </ScrollArea>
-              </TabsContent>
-            </Tabs>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+              <div className="flex justify-center mt-4">
+                <Button 
+                  onClick={() => {
+                    // Parse both TLV inputs simultaneously
+                    if (leftInputHex) {
+                      const leftDetectedFormat = detectFormat(leftInputHex);
+                      if (leftDetectedFormat !== "unknown") {
+                        handleLeftParse({ value: leftInputHex, format: leftDetectedFormat });
+                      } else {
+                        toast.error("Invalid format detected in Source TLV");
+                      }
+                    }
+                    
+                    if (rightInputHex) {
+                      const rightDetectedFormat = detectFormat(rightInputHex);
+                      if (rightDetectedFormat !== "unknown") {
+                        handleRightParse({ value: rightInputHex, format: rightDetectedFormat });
+                      } else {
+                        toast.error("Invalid format detected in Target TLV");
+                      }
+                    }
+                  }}
+                  className="px-8"
+                >
+                  Compare TLV Data
+                </Button>
+              </div>
+            </TabsContent>
+
+            {/* Results Tab Content */}
+            <TabsContent value="results" className="mt-4">
+              <div className="grid grid-cols-2 gap-4">
+                {/* Left Results */}
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium">{leftName}</h3>
+                  <CompactTlvDisplay
+                    result={filterUnknownTags(leftParseResult)}
+                    onRefresh={() =>
+                      handleLeftParse({ value: leftInputHex, format: leftFormat })
+                    }
+                    expandAll={expandAll}
+                  />
+                </div>
+
+                {/* Right Results */}
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium">{rightName}</h3>
+                  <CompactTlvDisplay
+                    result={filterUnknownTags(rightParseResult)}
+                    onRefresh={() =>
+                      handleRightParse({ value: rightInputHex, format: rightFormat })
+                    }
+                    expandAll={expandAll}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+
+      {/* Floating Action Buttons */}
+      <div className="fixed bottom-4 right-4 flex flex-col space-y-2">
+        <Button
+          variant="default"
+          size="icon"
+          className="rounded-full"
+          onClick={handleLoadExamples}
+          title="Load Example Data"
+        >
+          <ArrowUpFromLine className="h-4 w-4" />
+        </Button>
+
+        <Button
+          variant="default"
+          size="icon"
+          className="rounded-full"
+          onClick={() => {
+            if (leftParseResult) handleLeftParse({ value: leftInputHex, format: leftFormat });
+            if (rightParseResult) handleRightParse({ value: rightInputHex, format: rightFormat });
+          }}
+          title="Refresh Both"
+        >
+          <RefreshCw className="h-4 w-4" />
+        </Button>
+
+        <Button
+          variant="default"
+          size="icon"
+          className="rounded-full"
+          onClick={() => {
+            // Save comparison functionality would go here
+            toast.info("Save feature coming soon");
+          }}
+          title="Save Comparison"
+        >
+          <Save className="h-4 w-4" />
+        </Button>
+
+        <Button
+          variant="default"
+          size="icon"
+          className="rounded-full"
+          onClick={() => {
+            // Copy comparison results functionality would go here
+            navigator.clipboard.writeText(
+              JSON.stringify(
+                {
+                  left: leftParseResult
+                    ? formatTlvAsJson({
+                        elements: leftParseResult.elements,
+                        errors: leftParseResult.errors,
+                        rawHex: leftParseResult.rawHex,
+                      })
+                    : null,
+                  right: rightParseResult
+                    ? formatTlvAsJson({
+                        elements: rightParseResult.elements,
+                        errors: rightParseResult.errors,
+                        rawHex: rightParseResult.rawHex,
+                      })
+                    : null,
+                },
+                null,
+                2
+              )
+            );
+            toast.success("Comparison copied to clipboard as JSON");
+          }}
+          title="Copy as JSON"
+        >
+          <Copy className="h-4 w-4" />
+        </Button>
+      </div>
+    </>
   );
 }

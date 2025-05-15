@@ -51,11 +51,13 @@ export function CustomTagManager(): JSX.Element {
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [filteredTags, setFilteredTags] = useState<CustomTagDefinition[]>([]);
-  
+
   const [addDialogOpen, setAddDialogOpen] = useState<boolean>(false);
   const [editDialogOpen, setEditDialogOpen] = useState<boolean>(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
-  const [selectedTag, setSelectedTag] = useState<CustomTagDefinition | null>(null);
+  const [selectedTag, setSelectedTag] = useState<CustomTagDefinition | null>(
+    null
+  );
 
   // Load all custom tags
   const loadTags = async () => {
@@ -65,7 +67,11 @@ export function CustomTagManager(): JSX.Element {
       setTags(allTags);
       setFilteredTags(allTags);
     } catch (error) {
-      toast.error(`Error loading custom tags: ${error instanceof Error ? error.message : "Unknown error"}`);
+      toast.error(
+        `Error loading custom tags: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     } finally {
       setLoading(false);
     }
@@ -100,7 +106,7 @@ export function CustomTagManager(): JSX.Element {
       ...tagParams,
       created: new Date(),
     };
-    
+
     await db.addCustomTag(newTag);
     await loadTags();
   };
@@ -108,14 +114,14 @@ export function CustomTagManager(): JSX.Element {
   // Handle tag update
   const handleUpdateTag = async (tagParams: CustomTagCreationParams) => {
     if (!selectedTag) return;
-    
+
     // Create updated tag with original creation date and new modified date
     const updatedTag: CustomTagDefinition = {
       ...tagParams,
       created: selectedTag.created,
       modified: new Date(),
     };
-    
+
     await db.updateCustomTag(updatedTag);
     await loadTags();
   };
@@ -123,7 +129,7 @@ export function CustomTagManager(): JSX.Element {
   // Handle tag deletion
   const handleDeleteTag = async () => {
     if (!selectedTag) return;
-    
+
     try {
       await db.deleteCustomTag(selectedTag.id);
       toast.success(`Tag ${selectedTag.name} deleted successfully`);
@@ -131,14 +137,18 @@ export function CustomTagManager(): JSX.Element {
       setDeleteDialogOpen(false);
       setSelectedTag(null);
     } catch (error) {
-      toast.error(`Error deleting tag: ${error instanceof Error ? error.message : "Unknown error"}`);
+      toast.error(
+        `Error deleting tag: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     }
   };
 
   // Format length rules for display
   const formatLengthRule = (tag: CustomTagDefinition): string => {
     const { lengthRule } = tag;
-    
+
     if (lengthRule.type === LengthRuleType.Fixed) {
       return `Fixed: ${lengthRule.fixed} bytes`;
     } else if (lengthRule.type === LengthRuleType.Variable) {
@@ -147,7 +157,6 @@ export function CustomTagManager(): JSX.Element {
       return "Any length";
     }
   };
-
 
   return (
     <Card className="w-full max-w-5xl mx-auto">
@@ -159,10 +168,7 @@ export function CustomTagManager(): JSX.Element {
               Create and manage custom EMV tags for use in the TLV parser
             </CardDescription>
           </div>
-          <Button 
-            onClick={() => setAddDialogOpen(true)}
-            className="gap-1"
-          >
+          <Button onClick={() => setAddDialogOpen(true)} className="gap-1">
             <Plus className="h-4 w-4" /> Add Tag
           </Button>
         </div>
@@ -197,7 +203,9 @@ export function CustomTagManager(): JSX.Element {
               <TableBody>
                 {filteredTags.map((tag) => (
                   <TableRow key={tag.id}>
-                    <TableCell className="font-mono font-medium">{tag.id}</TableCell>
+                    <TableCell className="font-mono font-medium">
+                      {tag.id}
+                    </TableCell>
                     <TableCell>
                       <div className="font-medium">{tag.name}</div>
                       {tag.description && (
@@ -210,9 +218,7 @@ export function CustomTagManager(): JSX.Element {
                       <Badge variant="outline" className="mr-1">
                         {tag.format}
                       </Badge>
-                      <Badge variant="secondary">
-                        {tag.dataFormat}
-                      </Badge>
+                      <Badge variant="secondary">{tag.dataFormat}</Badge>
                     </TableCell>
                     <TableCell>{formatLengthRule(tag)}</TableCell>
                     <TableCell>
@@ -271,7 +277,8 @@ export function CustomTagManager(): JSX.Element {
       <CardFooter className="border-t px-6 py-4">
         <div className="flex justify-between items-center w-full">
           <p className="text-sm text-muted-foreground">
-            {filteredTags.length} custom tag{filteredTags.length !== 1 ? "s" : ""} found
+            {filteredTags.length} custom tag
+            {filteredTags.length !== 1 ? "s" : ""} found
             {searchQuery && tags.length !== filteredTags.length
               ? ` (filtered from ${tags.length} total)`
               : ""}
@@ -309,16 +316,13 @@ export function CustomTagManager(): JSX.Element {
       )}
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-      >
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the custom tag "{selectedTag?.name}" ({selectedTag?.id}). 
-              This action cannot be undone.
+              This will permanently delete the custom tag "{selectedTag?.name}"
+              ({selectedTag?.id}). This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardHeader,
@@ -8,110 +8,84 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Copy, HelpCircle } from "lucide-react";
+import { toast } from "sonner";
 import { TagClass, TagFormat } from "@/types/tlv";
 
 export const TERMINAL_CAPABILITIES = {
   tag: "9F33",
   name: "Terminal Capabilities",
-  description: "Indicates the capabilities of the terminal",
+  description:
+    "Indicates the card data input, CVM, and security capabilities of the terminal",
   format: TagFormat.PRIMITIVE,
   class: TagClass.CONTEXT_SPECIFIC,
   fixedLength: 6,
+  emvSpecRef: "Book 4, Section 6.5.14",
 };
 
-interface Capability {
-  bit: number;
-  description: string;
-}
-
-interface CapabilityGroup {
-  byte: number;
-  description: string;
-  capabilities: Capability[];
-}
-
-const capabilityGroups: CapabilityGroup[] = [
+// Define bit specifications for each byte based on the exact table
+const BYTE_SPECS = [
   {
-    byte: 1,
-    description: "Card Data Input Capability",
-    capabilities: [
-      { bit: 8, description: "Manual key entry" },
-      { bit: 7, description: "Magnetic stripe" },
-      { bit: 6, description: "IC with contacts" },
-      { bit: 5, description: "Reserved" },
-      { bit: 4, description: "Reserved" },
-      { bit: 3, description: "Reserved" },
-      { bit: 2, description: "Reserved" },
-      { bit: 1, description: "Reserved" },
+    name: "Byte 1 - Card Data Input Capability",
+    bits: [
+      { position: 8, description: "Manual key entry" },
+      { position: 7, description: "Magnetic stripe" },
+      { position: 6, description: "IC with contacts" },
+      { position: 5, description: "RFU" },
+      { position: 4, description: "RFU" },
+      { position: 3, description: "RFU" },
+      { position: 2, description: "RFU" },
+      { position: 1, description: "RFU" },
     ],
   },
   {
-    byte: 2,
-    description: "CVM Capability",
-    capabilities: [
-      { bit: 8, description: "Plaintext PIN for ICC verification" },
-      { bit: 7, description: "Enciphered PIN for online verification" },
-      { bit: 6, description: "Signature (paper)" },
-      { bit: 5, description: "Enciphered PIN for offline verification" },
-      { bit: 4, description: "No CVM required" },
-      { bit: 3, description: "Reserved" },
-      { bit: 2, description: "Reserved" },
-      { bit: 1, description: "Reserved" },
+    name: "Byte 2 - CVM Capability",
+    bits: [
+      {
+        position: 8,
+        description: "Plaintext PIN for offline ICC verification",
+      },
+      { position: 7, description: "Enciphered PIN for online verification" },
+      { position: 6, description: "Signature (paper)" },
+      { position: 5, description: "Enciphered PIN for offline verification" },
+      { position: 4, description: "No CVM Required" },
+      { position: 3, description: "RFU" },
+      { position: 2, description: "RFU" },
+      { position: 1, description: "RFU" },
     ],
   },
   {
-    byte: 3,
-    description: "Security Capability",
-    capabilities: [
-      { bit: 8, description: "Static data authentication (SDA)" },
-      { bit: 7, description: "Dynamic data authentication (DDA)" },
-      { bit: 6, description: "Card capture" },
-      { bit: 5, description: "Reserved" },
-      { bit: 4, description: "Reserved" },
-      { bit: 3, description: "Reserved" },
-      { bit: 2, description: "Reserved" },
-      { bit: 1, description: "Reserved" },
+    name: "Byte 3 - Security Capability",
+    bits: [
+      { position: 8, description: "Static Data Authentication (SDA)" },
+      { position: 7, description: "Dynamic Data Authentication (DDA)" },
+      { position: 6, description: "Capture card" },
+      { position: 5, description: "RFU" },
+      {
+        position: 4,
+        description: "Combined DDA/Application Cryptogram Generation",
+      },
+      { position: 3, description: "RFU" },
+      { position: 2, description: "RFU" },
+      { position: 1, description: "RFU" },
     ],
   },
 ];
 
-interface CapabilitiesState {
-  [key: string]: boolean;
-}
-
-function parseHexToCapabilities(hex: string): CapabilitiesState {
-  const capabilities: CapabilitiesState = {};
-  const bytes = [
-    parseInt(hex.substring(0, 2), 16),
-    parseInt(hex.substring(2, 4), 16),
-    parseInt(hex.substring(4, 6), 16),
-  ];
-  for (let byteIndex = 0; byteIndex < 3; byteIndex++) {
-    const byte = bytes[byteIndex];
-    for (let bit = 8; bit >= 1; bit--) {
-      const key = `${byteIndex + 1}-${bit}`;
-      capabilities[key] = (byte & (1 << (bit - 1))) !== 0;
-    }
-  }
-  return capabilities;
-}
-
-function capabilitiesToHex(capabilities: CapabilitiesState): string {
-  const bytes = [0, 0, 0];
-  for (const key in capabilities) {
-    const [byteStr, bitStr] = key.split("-");
-    const byteIndex = parseInt(byteStr) - 1;
-    const bit = parseInt(bitStr);
-    if (capabilities[key]) {
-      bytes[byteIndex] |= 1 << (bit - 1);
-    }
-  }
-  return bytes
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("")
-    .toUpperCase();
-}
+// Common configurations
+const COMMON_CONFIGS = [
+  { name: "Basic Contact", value: "E0E000" },
+  { name: "Full Contact", value: "E0F088" },
+  { name: "Contact+Contactless", value: "E0F8C8" },
+];
 
 interface TerminalCapabilitiesTagProps {
   value: string;
@@ -122,107 +96,247 @@ export function TerminalCapabilitiesTag({
   value,
   onChange,
 }: TerminalCapabilitiesTagProps) {
+  const [hexValue, setHexValue] = useState(value.toUpperCase());
   const [isEditing, setIsEditing] = useState(false);
-  const [capabilitiesState, setCapabilitiesState] = useState<CapabilitiesState>(
-    {}
-  );
+  const [bitValues, setBitValues] = useState<Array<Array<boolean>>>([]);
 
-  const handleEdit = () => {
-    setCapabilitiesState(parseHexToCapabilities(value));
-    setIsEditing(true);
+  // Parse hex value to bit arrays for the table
+  const parseToBits = (hexStr: string): Array<Array<boolean>> => {
+    // Ensure we have exactly 6 characters (3 bytes)
+    const validHex = hexStr
+      .replace(/[^0-9A-Fa-f]/g, "")
+      .padEnd(6, "0")
+      .substring(0, 6);
+
+    // Convert each byte to binary and then to a boolean array
+    const bytes = [
+      parseInt(validHex.substring(0, 2), 16),
+      parseInt(validHex.substring(2, 4), 16),
+      parseInt(validHex.substring(4, 6), 16),
+    ];
+
+    // Convert to 3-dimensional array [byte][bit][value]
+    return bytes.map((byte) =>
+      Array.from({ length: 8 }, (_, i) => ((byte >> (7 - i)) & 1) === 1)
+    );
   };
 
+  // Convert bit array back to hex
+  const bitsToHex = (bits: boolean[][]) => {
+    return bits
+      .map((byteBits) => {
+        let byteValue = 0;
+        byteBits.forEach((bit, index) => {
+          if (bit) {
+            byteValue |= 1 << (7 - index);
+          }
+        });
+        return byteValue.toString(16).padStart(2, "0").toUpperCase();
+      })
+      .join("");
+  };
+
+  // Initialize bit values when the value prop changes
+  useEffect(() => {
+    setBitValues(parseToBits(value));
+  }, [value]);
+
+  // Toggle a specific bit
+  const toggleBit = (byteIndex: number, bitIndex: number) => {
+    const newBitValues = [...bitValues];
+    newBitValues[byteIndex][bitIndex] = !newBitValues[byteIndex][bitIndex];
+    setBitValues(newBitValues);
+  };
+
+  // Update the hex value when manual input changes
+  const handleHexInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target.value
+      .replace(/[^0-9A-Fa-f]/g, "")
+      .substring(0, 6)
+      .toUpperCase();
+    setHexValue(input);
+    setBitValues(parseToBits(input));
+  };
+
+  // Handle save
   const handleSave = () => {
-    const newValue = capabilitiesToHex(capabilitiesState);
-    onChange(newValue);
+    const newHexValue = bitsToHex(bitValues);
+    setHexValue(newHexValue);
+    onChange(newHexValue);
     setIsEditing(false);
   };
 
-  const handleCancel = () => {
-    setIsEditing(false);
+  // Copy to clipboard
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast.success("Copied to clipboard!");
+    });
   };
 
-  const currentCapabilities = parseHexToCapabilities(value);
+  // Apply a predefined configuration
+  const applyConfig = (configValue: string) => {
+    setHexValue(configValue);
+    setBitValues(parseToBits(configValue));
+  };
 
   return (
-    <Card>
+    <Card className="w-full">
       <CardHeader>
-        <CardTitle>
-          {TERMINAL_CAPABILITIES.name} ({TERMINAL_CAPABILITIES.tag})
-        </CardTitle>
-        <CardDescription>{TERMINAL_CAPABILITIES.description}</CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>
+              {TERMINAL_CAPABILITIES.name} ({TERMINAL_CAPABILITIES.tag})
+            </CardTitle>
+            <CardDescription>
+              {TERMINAL_CAPABILITIES.description}
+            </CardDescription>
+          </div>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <HelpCircle className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-sm">
+                  EMV Reference: {TERMINAL_CAPABILITIES.emvSpecRef}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       </CardHeader>
       <CardContent>
-        {isEditing ? (
-          <div>
-            {capabilityGroups.map((group) => (
-              <div key={group.byte} className="mb-4">
-                <h3 className="text-lg font-semibold">{group.description}</h3>
-                {group.capabilities.map((cap) => (
-                  <div
-                    key={cap.bit}
-                    className="flex items-center space-x-2 mt-1"
+        <div className="mb-4">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="hex-value">Hex Value:</Label>
+            <div className="flex items-center space-x-2">
+              {isEditing ? (
+                <Input
+                  id="hex-value"
+                  value={hexValue}
+                  onChange={handleHexInputChange}
+                  className="w-32 font-mono text-right"
+                  maxLength={6}
+                />
+              ) : (
+                <div className="flex items-center">
+                  <code className="bg-muted px-2 py-1 rounded font-mono">
+                    {value.toUpperCase()}
+                  </code>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => copyToClipboard(value.toUpperCase())}
+                    className="ml-1 h-7 w-7"
                   >
-                    <Checkbox
-                      id={`${group.byte}-${cap.bit}`}
-                      checked={capabilitiesState[`${group.byte}-${cap.bit}`]}
-                      onCheckedChange={(checked) =>
-                        setCapabilitiesState((prev) => ({
-                          ...prev,
-                          [`${group.byte}-${cap.bit}`]: !!checked,
-                        }))
-                      }
-                    />
-                    <label
-                      htmlFor={`${group.byte}-${cap.bit}`}
-                      className="text-sm"
-                    >
-                      {cap.description}
-                    </label>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div>
-            <p className="mb-2">
-              <strong>Current Value:</strong> {value}
-            </p>
-            <h3 className="text-lg font-semibold mb-2">
-              Enabled Capabilities:
-            </h3>
-            {capabilityGroups.map((group) => {
-              const enabledCaps = group.capabilities.filter(
-                (cap) => currentCapabilities[`${group.byte}-${cap.bit}`]
-              );
-              return enabledCaps.length > 0 ? (
-                <div key={group.byte} className="mb-4">
-                  <h4 className="font-medium">{group.description}:</h4>
-                  <ul className="list-disc pl-5">
-                    {enabledCaps.map((cap) => (
-                      <li key={cap.bit} className="text-sm">
-                        {cap.description}
-                      </li>
-                    ))}
-                  </ul>
+                    <Copy className="h-3 w-3" />
+                  </Button>
                 </div>
-              ) : null;
-            })}
+              )}
+            </div>
           </div>
-        )}
+
+          {isEditing && (
+            <div className="flex space-x-2 mt-2">
+              {COMMON_CONFIGS.map((config) => (
+                <Button
+                  key={config.name}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => applyConfig(config.value)}
+                >
+                  {config.name}
+                </Button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Bit table layout exactly as in the example */}
+        <div className="space-y-6">
+          {BYTE_SPECS.map((byteSpec, byteIndex) => (
+            <div key={byteIndex}>
+              <h3 className="font-medium mb-2">{byteSpec.name}</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-muted/50">
+                      <th className="border px-2 py-1 w-10 text-center">b8</th>
+                      <th className="border px-2 py-1 w-10 text-center">b7</th>
+                      <th className="border px-2 py-1 w-10 text-center">b6</th>
+                      <th className="border px-2 py-1 w-10 text-center">b5</th>
+                      <th className="border px-2 py-1 w-10 text-center">b4</th>
+                      <th className="border px-2 py-1 w-10 text-center">b3</th>
+                      <th className="border px-2 py-1 w-10 text-center">b2</th>
+                      <th className="border px-2 py-1 w-10 text-center">b1</th>
+                      <th className="border px-4 py-1 text-left">Meaning</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {byteSpec.bits.map((bit, bitIndex) => (
+                      <tr key={bitIndex}>
+                        {Array.from({ length: 8 }, (_, i) => (
+                          <td
+                            key={i}
+                            className={`border px-2 py-1 text-center ${
+                              i === 8 - bit.position
+                                ? bitValues[byteIndex]?.[i]
+                                  ? "bg-primary/10"
+                                  : ""
+                                : ""
+                            }`}
+                            onClick={() =>
+                              isEditing ? toggleBit(byteIndex, i) : null
+                            }
+                            style={{
+                              cursor: isEditing ? "pointer" : "default",
+                            }}
+                          >
+                            {i === 8 - bit.position
+                              ? bitValues[byteIndex]?.[i]
+                                ? "1"
+                                : "0"
+                              : ""}
+                          </td>
+                        ))}
+                        <td
+                          className={`border px-4 py-1 text-left ${
+                            bitValues[byteIndex]?.[8 - bit.position]
+                              ? "bg-primary/10"
+                              : ""
+                          }`}
+                        >
+                          {bit.description}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+        </div>
       </CardContent>
-      <CardFooter className="flex justify-end space-x-2">
-        {isEditing ? (
-          <>
-            <Button onClick={handleSave}>Save</Button>
-            <Button variant="outline" onClick={handleCancel}>
-              Cancel
-            </Button>
-          </>
-        ) : (
-          <Button onClick={handleEdit}>Edit</Button>
-        )}
+      <CardFooter className="flex justify-between">
+        <div>
+          <p className="text-xs text-muted-foreground">
+            EMV Spec Reference: {TERMINAL_CAPABILITIES.emvSpecRef}
+          </p>
+        </div>
+        <div>
+          {isEditing ? (
+            <div className="space-x-2">
+              <Button onClick={handleSave}>Save</Button>
+              <Button variant="outline" onClick={() => setIsEditing(false)}>
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <Button onClick={() => setIsEditing(true)}>Edit</Button>
+          )}
+        </div>
       </CardFooter>
     </Card>
   );

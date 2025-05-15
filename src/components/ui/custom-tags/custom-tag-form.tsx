@@ -1,4 +1,5 @@
 import { useState, useEffect, type JSX } from "react";
+import { sanitizeSelectValues } from "@/utils/select-helpers";
 import {
   Dialog,
   DialogContent,
@@ -107,45 +108,51 @@ export function CustomTagForm({
   useEffect(() => {
     if ((editTag || initialValues) && isOpen) {
       let formValues: Partial<FormSchema> = {};
-      
+
       if (editTag) {
+        // Sanitize the tag to prevent empty string values which cause errors in Select components
+        const safeTag = sanitizeSelectValues(editTag);
+
         // Initialize lengthRuleType and related fields from lengthRule
-        const lengthRuleType = editTag.lengthRule.type;
+        const lengthRuleType = safeTag.lengthRule.type;
         let fixedLength: number | undefined;
         let minLength: number | undefined;
         let maxLength: number | undefined;
 
         if (lengthRuleType === LengthRuleType.Fixed) {
-          fixedLength = editTag.lengthRule.fixed;
+          fixedLength = safeTag.lengthRule.fixed;
         } else if (lengthRuleType === LengthRuleType.Variable) {
-          minLength = editTag.lengthRule.min;
-          maxLength = editTag.lengthRule.max;
+          minLength = safeTag.lengthRule.min;
+          maxLength = safeTag.lengthRule.max;
         }
 
         formValues = {
-          id: editTag.id,
-          name: editTag.name,
-          description: editTag.description || "",
-          format: editTag.format,
-          dataFormat: editTag.dataFormat,
+          id: safeTag.id,
+          name: safeTag.name,
+          description: safeTag.description || "",
+          format: safeTag.format,
+          dataFormat: safeTag.dataFormat,
           lengthRuleType,
           fixedLength,
           minLength,
           maxLength,
-          displayFormat: editTag.displayFormat,
+          displayFormat: safeTag.displayFormat,
         };
       } else if (initialValues) {
+        // Sanitize the initial values
+        const safeValues = sanitizeSelectValues(initialValues);
+
         // Initialize from provided initial values
-        const lengthRuleType = initialValues.lengthRule?.type;
+        const lengthRuleType = safeValues.lengthRule?.type;
         let fixedLength: number | undefined;
         let minLength: number | undefined;
         let maxLength: number | undefined;
 
         if (lengthRuleType === LengthRuleType.Fixed) {
-          fixedLength = initialValues.lengthRule?.fixed;
+          fixedLength = safeValues.lengthRule?.fixed;
         } else if (lengthRuleType === LengthRuleType.Variable) {
-          minLength = initialValues.lengthRule?.min;
-          maxLength = initialValues.lengthRule?.max;
+          minLength = safeValues.lengthRule?.min;
+          maxLength = safeValues.lengthRule?.max;
         }
 
         formValues = {
@@ -161,7 +168,7 @@ export function CustomTagForm({
           displayFormat: initialValues.displayFormat || DisplayFormat.Hex,
         };
       }
-      
+
       form.reset(formValues);
     }
   }, [editTag, initialValues, isOpen, form]);
@@ -185,7 +192,9 @@ export function CustomTagForm({
         };
       } else if (values.lengthRuleType === LengthRuleType.Variable) {
         if (!values.minLength || !values.maxLength) {
-          toast.error("Min and max length values are required for variable length");
+          toast.error(
+            "Min and max length values are required for variable length"
+          );
           setIsSubmitting(false);
           return;
         }
@@ -219,17 +228,23 @@ export function CustomTagForm({
 
       // Save the tag
       await onSave(customTag);
-      
+
       // Reset the form
       form.reset();
-      
+
       // Close the dialog
       onClose();
-      
+
       // Show success message
-      toast.success(`Custom tag ${editTag ? "updated" : "created"} successfully`);
+      toast.success(
+        `Custom tag ${editTag ? "updated" : "created"} successfully`
+      );
     } catch (error) {
-      toast.error(`Error ${editTag ? "updating" : "creating"} custom tag: ${error instanceof Error ? error.message : "Unknown error"}`);
+      toast.error(
+        `Error ${editTag ? "updating" : "creating"} custom tag: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -248,7 +263,7 @@ export function CustomTagForm({
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
-        
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -260,9 +275,9 @@ export function CustomTagForm({
                   <FormItem>
                     <FormLabel>Tag ID</FormLabel>
                     <FormControl>
-                      <Input 
-                        placeholder="9F1A" 
-                        {...field} 
+                      <Input
+                        placeholder="9F1A"
+                        {...field}
                         maxLength={4}
                         disabled={!!editTag} // Disable editing of ID for existing tags
                       />
@@ -274,7 +289,7 @@ export function CustomTagForm({
                   </FormItem>
                 )}
               />
-              
+
               {/* Tag Format */}
               <FormField
                 control={form.control}
@@ -317,7 +332,9 @@ export function CustomTagForm({
                   <FormControl>
                     <Input placeholder="Terminal Country Code" {...field} />
                   </FormControl>
-                  <FormDescription>Descriptive name for the tag</FormDescription>
+                  <FormDescription>
+                    Descriptive name for the tag
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -331,13 +348,15 @@ export function CustomTagForm({
                 <FormItem>
                   <FormLabel>Description</FormLabel>
                   <FormControl>
-                    <Textarea 
-                      placeholder="Details about this tag's purpose and usage" 
-                      {...field} 
+                    <Textarea
+                      placeholder="Details about this tag's purpose and usage"
+                      {...field}
                       rows={2}
                     />
                   </FormControl>
-                  <FormDescription>Optional details about the tag</FormDescription>
+                  <FormDescription>
+                    Optional details about the tag
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -400,13 +419,15 @@ export function CustomTagForm({
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormDescription>How to display the tag value</FormDescription>
+                    <FormDescription>
+                      How to display the tag value
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
-            
+
             {/* Length Rule Type */}
             <FormField
               control={form.control}
@@ -432,7 +453,9 @@ export function CustomTagForm({
                       ))}
                     </SelectContent>
                   </Select>
-                  <FormDescription>Length constraints for the tag</FormDescription>
+                  <FormDescription>
+                    Length constraints for the tag
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -447,15 +470,23 @@ export function CustomTagForm({
                   <FormItem>
                     <FormLabel>Fixed Length</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        {...field} 
-                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                      <Input
+                        type="number"
+                        {...field}
+                        onChange={(e) =>
+                          field.onChange(
+                            e.target.value
+                              ? parseInt(e.target.value, 10)
+                              : undefined
+                          )
+                        }
                         min={1}
                         max={255}
                       />
                     </FormControl>
-                    <FormDescription>Exact length in bytes (1-255)</FormDescription>
+                    <FormDescription>
+                      Exact length in bytes (1-255)
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -471,20 +502,28 @@ export function CustomTagForm({
                     <FormItem>
                       <FormLabel>Minimum Length</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
-                          {...field} 
-                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                        <Input
+                          type="number"
+                          {...field}
+                          onChange={(e) =>
+                            field.onChange(
+                              e.target.value
+                                ? parseInt(e.target.value, 10)
+                                : undefined
+                            )
+                          }
                           min={0}
                           max={255}
                         />
                       </FormControl>
-                      <FormDescription>Min length in bytes (0-255)</FormDescription>
+                      <FormDescription>
+                        Min length in bytes (0-255)
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={form.control}
                   name="maxLength"
@@ -492,15 +531,23 @@ export function CustomTagForm({
                     <FormItem>
                       <FormLabel>Maximum Length</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
-                          {...field} 
-                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                        <Input
+                          type="number"
+                          {...field}
+                          onChange={(e) =>
+                            field.onChange(
+                              e.target.value
+                                ? parseInt(e.target.value, 10)
+                                : undefined
+                            )
+                          }
                           min={1}
                           max={255}
                         />
                       </FormControl>
-                      <FormDescription>Max length in bytes (1-255)</FormDescription>
+                      <FormDescription>
+                        Max length in bytes (1-255)
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
