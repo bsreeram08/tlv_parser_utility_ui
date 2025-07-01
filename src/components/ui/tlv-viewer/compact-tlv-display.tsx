@@ -294,7 +294,7 @@ function CompactTlvElement({
             )}
             {/* Value display with tabs */}
             {element.length > 0 && (
-              <div className="mt-3">
+              <div className="mt-3 mb-3">
                 <Tabs value={activeValueTab} onValueChange={setActiveValueTab}>
                   <TabsList className="h-8">
                     <TabsTrigger value="hex" className="text-xs">

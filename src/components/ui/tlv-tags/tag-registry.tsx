@@ -1,6 +1,13 @@
 import { type ReactNode } from "react";
 import { sanitizeSelectValues } from "@/utils/select-helpers";
 import { TerminalCapabilitiesTag } from "./terminal-capabilities";
+import { ApplicationInterchangeProfileTag } from "./application-interchange-profile";
+import { TerminalVerificationResultsTag } from "./terminal-verification-results";
+import { CVMResultsTag } from "./cvm-results";
+import { TransactionDateTag } from "./transaction-date";
+import { CurrencyCodeTag } from "./currency-code";
+import { TransactionTypeTag } from "./transaction-type";
+import { AmountAuthorisedTag } from "./amount-authorised";
 
 // Interface for tag renderer props
 export interface TagRendererProps {
@@ -20,11 +27,48 @@ const tagRegistry: Record<string, TagRenderer> = {
     <TerminalCapabilitiesTag value={value} onChange={onChange || (() => {})} />
   ),
 
+  // EMV Application Interchange Profile
+  "82": ({ value, onChange }) => (
+    <ApplicationInterchangeProfileTag
+      value={value}
+      onChange={onChange || (() => {})}
+    />
+  ),
+
+  // EMV Terminal Verification Results
+  "95": ({ value, onChange }) => (
+    <TerminalVerificationResultsTag
+      value={value}
+      onChange={onChange || (() => {})}
+    />
+  ),
+
+  // EMV CVM Results
+  "9F34": ({ value, onChange }) => (
+    <CVMResultsTag value={value} onChange={onChange || (() => {})} />
+  ),
+
+  // EMV Transaction Date
+  "9A": ({ value, onChange }) => (
+    <TransactionDateTag value={value} onChange={onChange || (() => {})} />
+  ),
+
+  // EMV Currency Code
+  "5F2A": ({ value, onChange }) => (
+    <CurrencyCodeTag value={value} onChange={onChange || (() => {})} />
+  ),
+
+  // EMV Transaction Type
+  "9C": ({ value, onChange }) => (
+    <TransactionTypeTag value={value} onChange={onChange || (() => {})} />
+  ),
+
+  // EMV Amount Authorised
+  "9F02": ({ value, onChange }) => (
+    <AmountAuthorisedTag value={value} onChange={onChange || (() => {})} />
+  ),
+
   // Add more tag-specific renderers here
-  // Example:
-  // "9F34": ({ value, onChange }) => (
-  //   <CVMResultsTag value={value} onChange={onChange || (() => {})} />
-  // ),
 };
 
 /**
@@ -34,9 +78,9 @@ const tagRegistry: Record<string, TagRenderer> = {
  */
 export function getTagRenderer(tag: string): TagRenderer | undefined {
   const renderer = tagRegistry[tag];
-  
+
   if (!renderer) return undefined;
-  
+
   // Return a wrapper that sanitizes props before rendering
   return (props) => {
     // Sanitize props to avoid empty strings in SelectItem components

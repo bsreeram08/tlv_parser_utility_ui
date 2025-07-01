@@ -53,10 +53,17 @@ function App() {
     }
   };
 
+  // Determine if current module needs full width
+  const needsFullWidth = activeModule === "tlv-comparison";
+
   return (
     <>
       <MainLayout onNavigate={handleNavigation} activeModule={activeModule}>
-        <div className="w-full max-w-5xl mx-auto">{renderModule()}</div>
+        <div className={`w-full mx-auto ${
+          needsFullWidth ? "max-w-none px-4" : "max-w-5xl"
+        }`}>
+          {renderModule()}
+        </div>
       </MainLayout>
 
       {/* Global toast notifications */}

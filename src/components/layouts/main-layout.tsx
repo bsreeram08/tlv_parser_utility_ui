@@ -6,7 +6,6 @@ import {
   KeyRound,
   Settings,
   Menu,
-  X,
   Tag,
   ChevronDown,
   PanelLeftClose,
@@ -14,7 +13,7 @@ import {
   GitCompare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Toaster } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";

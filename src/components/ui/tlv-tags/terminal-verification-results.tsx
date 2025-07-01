@@ -19,64 +19,103 @@ import { Copy, Edit3, Save, X, Info } from "lucide-react";
 import { toast } from "sonner";
 import { TagClass, TagFormat } from "@/types/tlv";
 
-export const TERMINAL_CAPABILITIES = {
-  tag: "9F33",
-  name: "Terminal Capabilities",
+export const TERMINAL_VERIFICATION_RESULTS = {
+  tag: "95",
+  name: "Terminal Verification Results",
   description:
-    "Indicates the card data input, CVM, and security capabilities of the terminal",
+    "Status of the different functions as seen from the terminal",
   format: TagFormat.PRIMITIVE,
   class: TagClass.CONTEXT_SPECIFIC,
-  fixedLength: 6,
-  emvSpecRef: "Book 4, Section 6.5.14",
+  fixedLength: 5,
+  emvSpecRef: "Book 4, Section 6.5.13",
 };
 
-// Compact capability definitions
-const CAPABILITIES = {
+// TVR bit specifications based on EMV specifications (5 bytes)
+const TVR_VERIFICATION_STATUS = {
   byte1: {
-    name: "Card Data Input",
+    name: "Byte 1 - Offline Data Authentication",
     bits: {
-      0x80: "Manual key entry",
-      0x40: "Magnetic stripe", 
-      0x20: "IC with contacts"
+      0x80: "Offline data authentication was not performed",
+      0x40: "SDA failed",
+      0x20: "ICC data missing",
+      0x10: "Card appears on terminal exception file",
+      0x08: "DDA failed",
+      0x04: "CDA failed",
+      0x02: "SDA selected",
+      0x01: "Reserved for use by the payment system"
     }
   },
   byte2: {
-    name: "CVM Capability",
+    name: "Byte 2 - Cardholder Verification",
     bits: {
-      0x80: "Plaintext PIN offline",
-      0x40: "Enciphered PIN online",
-      0x20: "Signature (paper)",
-      0x10: "Enciphered PIN offline",
-      0x08: "No CVM Required"
+      0x80: "ICC and terminal have different application versions",
+      0x40: "Expired application",
+      0x20: "Application not yet effective",
+      0x10: "Requested service not allowed for card product",
+      0x08: "New card",
+      0x04: "Reserved for use by the payment system",
+      0x02: "Reserved for use by the payment system",
+      0x01: "Reserved for use by the payment system"
     }
   },
   byte3: {
-    name: "Security Capability", 
+    name: "Byte 3 - Cardholder Verification",
     bits: {
-      0x80: "SDA",
-      0x40: "DDA",
-      0x20: "Card capture",
-      0x08: "CDA"
+      0x80: "Cardholder verification was not successful",
+      0x40: "Unrecognised CVM",
+      0x20: "PIN Try Limit exceeded",
+      0x10: "PIN entry required and PIN pad not present or not working",
+      0x08: "PIN entry required, PIN pad present, but PIN was not entered",
+      0x04: "Online PIN entered",
+      0x02: "Reserved for use by the payment system",
+      0x01: "Reserved for use by the payment system"
+    }
+  },
+  byte4: {
+    name: "Byte 4 - Terminal Risk Management",
+    bits: {
+      0x80: "Transaction exceeds floor limit",
+      0x40: "Lower consecutive offline limit exceeded",
+      0x20: "Upper consecutive offline limit exceeded",
+      0x10: "Transaction selected randomly for online processing",
+      0x08: "Merchant forced transaction online",
+      0x04: "Reserved for use by the payment system",
+      0x02: "Reserved for use by the payment system",
+      0x01: "Reserved for use by the payment system"
+    }
+  },
+  byte5: {
+    name: "Byte 5 - Issuer Authentication",
+    bits: {
+      0x80: "Default TDOL used",
+      0x40: "Issuer authentication failed",
+      0x20: "Script processing failed before final GENERATE AC",
+      0x10: "Script processing failed after final GENERATE AC",
+      0x08: "Reserved for use by the payment system",
+      0x04: "Reserved for use by the payment system",
+      0x02: "Reserved for use by the payment system",
+      0x01: "Reserved for use by the payment system"
     }
   }
 };
 
-// Common configurations
-const COMMON_CONFIGS = [
-  { name: "Basic Contact", value: "E0E000", desc: "Manual + MSR + Contact" },
-  { name: "Full Contact", value: "E0F088", desc: "All input + All CVM + SDA/DDA" },
-  { name: "Contactless", value: "E0F8C8", desc: "Full capabilities + CDA" },
+// Common TVR configurations
+const COMMON_TVR_CONFIGS = [
+  { name: "All OK", value: "0000000000", desc: "No verification issues" },
+  { name: "Offline Auth Failed", value: "4000000000", desc: "SDA failed" },
+  { name: "PIN Failed", value: "0080000000", desc: "Cardholder verification failed" },
+  { name: "Over Floor Limit", value: "0000008000", desc: "Transaction over floor limit" },
 ];
 
-interface TerminalCapabilitiesTagProps {
+interface TerminalVerificationResultsProps {
   value: string;
   onChange: (newValue: string) => void;
 }
 
-export function TerminalCapabilitiesTag({
+export function TerminalVerificationResultsTag({
   value,
   onChange,
-}: TerminalCapabilitiesTagProps) {
+}: TerminalVerificationResultsProps) {
   const [hexValue, setHexValue] = useState(value.toUpperCase());
   const [isEditing, setIsEditing] = useState(false);
   const [byteValues, setByteValues] = useState<number[]>([]);
@@ -85,13 +124,15 @@ export function TerminalCapabilitiesTag({
   const parseToBytes = (hexStr: string): number[] => {
     const validHex = hexStr
       .replace(/[^0-9A-Fa-f]/g, "")
-      .padEnd(6, "0")
-      .substring(0, 6);
+      .padEnd(10, "0")
+      .substring(0, 10);
     
     return [
       parseInt(validHex.substring(0, 2), 16),
-      parseInt(validHex.substring(2, 4), 16), 
+      parseInt(validHex.substring(2, 4), 16),
       parseInt(validHex.substring(4, 6), 16),
+      parseInt(validHex.substring(6, 8), 16),
+      parseInt(validHex.substring(8, 10), 16),
     ];
   };
 
@@ -107,8 +148,8 @@ export function TerminalCapabilitiesTag({
     setByteValues(parseToBytes(value));
   }, [value]);
 
-  // Toggle a specific capability
-  const toggleCapability = (byteIndex: number, bitMask: number) => {
+  // Toggle a specific verification status
+  const toggleVerification = (byteIndex: number, bitMask: number) => {
     const newBytes = [...byteValues];
     newBytes[byteIndex] ^= bitMask;
     setByteValues(newBytes);
@@ -118,7 +159,7 @@ export function TerminalCapabilitiesTag({
   const handleHexInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.target.value
       .replace(/[^0-9A-Fa-f]/g, "")
-      .substring(0, 6)
+      .substring(0, 10)
       .toUpperCase();
     setHexValue(input);
     setByteValues(parseToBytes(input));
@@ -145,13 +186,16 @@ export function TerminalCapabilitiesTag({
     setByteValues(parseToBytes(configValue));
   };
 
-  // Get active capabilities for a byte
-  const getActiveCapabilities = (byteIndex: number, capabilities: Record<number, string>) => {
+  // Get active verification issues for a byte
+  const getActiveIssues = (byteIndex: number, verifications: Record<number, string>) => {
     const byteVal = byteValues[byteIndex] || 0;
-    return Object.entries(capabilities)
+    return Object.entries(verifications)
       .filter(([mask]) => (byteVal & parseInt(mask)) !== 0)
       .map(([, desc]) => desc);
   };
+
+  // Check if there are any verification issues
+  const hasIssues = byteValues.some(byte => byte !== 0);
 
   return (
     <Card className="w-full">
@@ -159,7 +203,7 @@ export function TerminalCapabilitiesTag({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <CardTitle className="text-lg">
-              Terminal Capabilities ({TERMINAL_CAPABILITIES.tag})
+              Terminal Verification Results ({TERMINAL_VERIFICATION_RESULTS.tag})
             </CardTitle>
             <TooltipProvider>
               <Tooltip>
@@ -170,12 +214,17 @@ export function TerminalCapabilitiesTag({
                 </TooltipTrigger>
                 <TooltipContent>
                   <p className="text-sm max-w-xs">
-                    {TERMINAL_CAPABILITIES.description}<br/>
-                    EMV Ref: {TERMINAL_CAPABILITIES.emvSpecRef}
+                    {TERMINAL_VERIFICATION_RESULTS.description}<br/>
+                    EMV Ref: {TERMINAL_VERIFICATION_RESULTS.emvSpecRef}
                   </p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+            {!isEditing && (
+              <Badge variant={hasIssues ? "destructive" : "secondary"} className="text-xs">
+                {hasIssues ? "Issues Detected" : "All OK"}
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {isEditing ? (
@@ -213,15 +262,15 @@ export function TerminalCapabilitiesTag({
                 id="hex-input"
                 value={hexValue}
                 onChange={handleHexInputChange}
-                className="w-24 h-8 font-mono text-center"
-                maxLength={6}
-                placeholder="E0F088"
+                className="w-32 h-8 font-mono text-center"
+                maxLength={10}
+                placeholder="0000000000"
               />
             </div>
             
             <div className="flex flex-wrap gap-2">
               <span className="text-sm font-medium">Presets:</span>
-              {COMMON_CONFIGS.map((config) => (
+              {COMMON_TVR_CONFIGS.map((config) => (
                 <TooltipProvider key={config.name}>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -244,37 +293,53 @@ export function TerminalCapabilitiesTag({
           </div>
         )}
 
-        {/* Compact capability display */}
+        {/* Compact verification display */}
         <div className="grid gap-3">
-          {Object.entries(CAPABILITIES).map(([key, cap], byteIndex) => {
-            const activeCaps = getActiveCapabilities(byteIndex, cap.bits);
+          {Object.entries(TVR_VERIFICATION_STATUS).map(([key, verification], byteIndex) => {
+            const activeIssues = getActiveIssues(byteIndex, verification.bits);
             const byteVal = byteValues[byteIndex] || 0;
+            const hasIssuesInByte = byteVal !== 0;
             
             return (
-              <div key={key} className="border rounded-lg p-3">
+              <div key={key} className={`border rounded-lg p-3 ${
+                hasIssuesInByte ? 'border-red-200' : 'border-gray-200'
+              }`}>
                 <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-medium text-sm">{cap.name}</h4>
-                  <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
-                    0x{byteVal.toString(16).padStart(2, "0").toUpperCase()}
-                  </code>
+                  <h4 className="font-medium text-sm">{verification.name}</h4>
+                  <div className="flex items-center gap-2">
+                    <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
+                      0x{byteVal.toString(16).padStart(2, "0").toUpperCase()}
+                    </code>
+                    {hasIssuesInByte && (
+                      <Badge variant="destructive" className="text-xs py-0 px-1.5">
+                        {activeIssues.length} issue{activeIssues.length > 1 ? 's' : ''}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 
                 <div className="space-y-1">
-                  {Object.entries(cap.bits).map(([mask, desc]) => {
+                  {Object.entries(verification.bits).map(([mask, desc]) => {
                     const isActive = (byteVal & parseInt(mask)) !== 0;
+                    const isReserved = desc.includes("Reserved");
+                    
                     return (
                       <div key={mask} className="flex items-center gap-2">
-                        {isEditing ? (
+                        {isEditing && !isReserved ? (
                           <input
                             type="checkbox"
                             checked={isActive}
-                            onChange={() => toggleCapability(byteIndex, parseInt(mask))}
+                            onChange={() => toggleVerification(byteIndex, parseInt(mask))}
                             className="h-3 w-3"
                           />
                         ) : (
-                          <div className={`h-3 w-3 rounded-sm border ${isActive ? 'bg-primary border-primary' : 'border-muted-foreground'}`} />
+                          <div className={`h-3 w-3 rounded-sm border ${
+                            isActive ? 'bg-red-500 border-red-500' : 'border-muted-foreground'
+                          } ${isReserved ? 'opacity-50' : ''}`} />
                         )}
-                        <span className={`text-xs ${isActive ? 'font-medium' : 'text-muted-foreground'}`}>
+                        <span className={`text-xs ${
+                          isActive ? 'font-medium text-red-700' : 'text-muted-foreground'
+                        } ${isReserved ? 'italic opacity-75' : ''}`}>
                           {desc}
                         </span>
                       </div>
@@ -282,11 +347,11 @@ export function TerminalCapabilitiesTag({
                   })}
                 </div>
                 
-                {!isEditing && activeCaps.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {activeCaps.map((cap, idx) => (
-                      <Badge key={idx} variant="secondary" className="text-xs py-0 px-1.5">
-                        {cap}
+                {!isEditing && activeIssues.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-red-200">
+                    {activeIssues.map((issue, idx) => (
+                      <Badge key={idx} variant="destructive" className="text-xs py-0 px-1.5">
+                        {issue}
                       </Badge>
                     ))}
                   </div>

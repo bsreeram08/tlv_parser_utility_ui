@@ -19,64 +19,64 @@ import { Copy, Edit3, Save, X, Info } from "lucide-react";
 import { toast } from "sonner";
 import { TagClass, TagFormat } from "@/types/tlv";
 
-export const TERMINAL_CAPABILITIES = {
-  tag: "9F33",
-  name: "Terminal Capabilities",
+export const APPLICATION_INTERCHANGE_PROFILE = {
+  tag: "82",
+  name: "Application Interchange Profile",
   description:
-    "Indicates the card data input, CVM, and security capabilities of the terminal",
+    "Indicates the capabilities of the card to support specific functions in the application",
   format: TagFormat.PRIMITIVE,
   class: TagClass.CONTEXT_SPECIFIC,
-  fixedLength: 6,
-  emvSpecRef: "Book 4, Section 6.5.14",
+  fixedLength: 2,
+  emvSpecRef: "Book 4, Section 6.5.1",
 };
 
-// Compact capability definitions
-const CAPABILITIES = {
+// AIP bit specifications based on EMV specifications
+const AIP_CAPABILITIES = {
   byte1: {
-    name: "Card Data Input",
+    name: "Byte 1 - Processing Options",
     bits: {
-      0x80: "Manual key entry",
-      0x40: "Magnetic stripe", 
-      0x20: "IC with contacts"
+      0x80: "SDA supported",
+      0x40: "DDA supported", 
+      0x20: "Cardholder verification is supported",
+      0x10: "Terminal risk management is to be performed",
+      0x08: "Issuer authentication is supported",
+      0x04: "Reserved for use by the payment system",
+      0x02: "CDA supported",
+      0x01: "Reserved for use by the payment system"
     }
   },
   byte2: {
-    name: "CVM Capability",
+    name: "Byte 2 - Additional Options",
     bits: {
-      0x80: "Plaintext PIN offline",
-      0x40: "Enciphered PIN online",
-      0x20: "Signature (paper)",
-      0x10: "Enciphered PIN offline",
-      0x08: "No CVM Required"
-    }
-  },
-  byte3: {
-    name: "Security Capability", 
-    bits: {
-      0x80: "SDA",
-      0x40: "DDA",
-      0x20: "Card capture",
-      0x08: "CDA"
+      0x80: "Reserved for use by the payment system",
+      0x40: "Reserved for use by the payment system",
+      0x20: "Reserved for use by the payment system", 
+      0x10: "Reserved for use by the payment system",
+      0x08: "Reserved for use by the payment system",
+      0x04: "Reserved for use by the payment system",
+      0x02: "Reserved for use by the payment system",
+      0x01: "Reserved for use by the payment system"
     }
   }
 };
 
-// Common configurations
-const COMMON_CONFIGS = [
-  { name: "Basic Contact", value: "E0E000", desc: "Manual + MSR + Contact" },
-  { name: "Full Contact", value: "E0F088", desc: "All input + All CVM + SDA/DDA" },
-  { name: "Contactless", value: "E0F8C8", desc: "Full capabilities + CDA" },
+// Common AIP configurations
+const COMMON_AIP_CONFIGS = [
+  { name: "SDA Only", value: "8000", desc: "Static Data Authentication only" },
+  { name: "DDA", value: "4000", desc: "Dynamic Data Authentication" },
+  { name: "CDA", value: "4200", desc: "Combined DDA/Application Cryptogram" },
+  { name: "Full Support", value: "FC00", desc: "All authentication methods" },
 ];
 
-interface TerminalCapabilitiesTagProps {
+interface ApplicationInterchangeProfileProps {
   value: string;
   onChange: (newValue: string) => void;
 }
 
-export function TerminalCapabilitiesTag({
+export function ApplicationInterchangeProfileTag({
   value,
   onChange,
-}: TerminalCapabilitiesTagProps) {
+}: ApplicationInterchangeProfileProps) {
   const [hexValue, setHexValue] = useState(value.toUpperCase());
   const [isEditing, setIsEditing] = useState(false);
   const [byteValues, setByteValues] = useState<number[]>([]);
@@ -85,13 +85,12 @@ export function TerminalCapabilitiesTag({
   const parseToBytes = (hexStr: string): number[] => {
     const validHex = hexStr
       .replace(/[^0-9A-Fa-f]/g, "")
-      .padEnd(6, "0")
-      .substring(0, 6);
+      .padEnd(4, "0")
+      .substring(0, 4);
     
     return [
       parseInt(validHex.substring(0, 2), 16),
-      parseInt(validHex.substring(2, 4), 16), 
-      parseInt(validHex.substring(4, 6), 16),
+      parseInt(validHex.substring(2, 4), 16),
     ];
   };
 
@@ -118,7 +117,7 @@ export function TerminalCapabilitiesTag({
   const handleHexInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.target.value
       .replace(/[^0-9A-Fa-f]/g, "")
-      .substring(0, 6)
+      .substring(0, 4)
       .toUpperCase();
     setHexValue(input);
     setByteValues(parseToBytes(input));
@@ -159,7 +158,7 @@ export function TerminalCapabilitiesTag({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <CardTitle className="text-lg">
-              Terminal Capabilities ({TERMINAL_CAPABILITIES.tag})
+              Application Interchange Profile ({APPLICATION_INTERCHANGE_PROFILE.tag})
             </CardTitle>
             <TooltipProvider>
               <Tooltip>
@@ -170,8 +169,8 @@ export function TerminalCapabilitiesTag({
                 </TooltipTrigger>
                 <TooltipContent>
                   <p className="text-sm max-w-xs">
-                    {TERMINAL_CAPABILITIES.description}<br/>
-                    EMV Ref: {TERMINAL_CAPABILITIES.emvSpecRef}
+                    {APPLICATION_INTERCHANGE_PROFILE.description}<br/>
+                    EMV Ref: {APPLICATION_INTERCHANGE_PROFILE.emvSpecRef}
                   </p>
                 </TooltipContent>
               </Tooltip>
@@ -213,15 +212,15 @@ export function TerminalCapabilitiesTag({
                 id="hex-input"
                 value={hexValue}
                 onChange={handleHexInputChange}
-                className="w-24 h-8 font-mono text-center"
-                maxLength={6}
-                placeholder="E0F088"
+                className="w-20 h-8 font-mono text-center"
+                maxLength={4}
+                placeholder="8000"
               />
             </div>
             
             <div className="flex flex-wrap gap-2">
               <span className="text-sm font-medium">Presets:</span>
-              {COMMON_CONFIGS.map((config) => (
+              {COMMON_AIP_CONFIGS.map((config) => (
                 <TooltipProvider key={config.name}>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -246,7 +245,7 @@ export function TerminalCapabilitiesTag({
 
         {/* Compact capability display */}
         <div className="grid gap-3">
-          {Object.entries(CAPABILITIES).map(([key, cap], byteIndex) => {
+          {Object.entries(AIP_CAPABILITIES).map(([key, cap], byteIndex) => {
             const activeCaps = getActiveCapabilities(byteIndex, cap.bits);
             const byteVal = byteValues[byteIndex] || 0;
             
@@ -262,9 +261,11 @@ export function TerminalCapabilitiesTag({
                 <div className="space-y-1">
                   {Object.entries(cap.bits).map(([mask, desc]) => {
                     const isActive = (byteVal & parseInt(mask)) !== 0;
+                    const isReserved = desc.includes("Reserved");
+                    
                     return (
                       <div key={mask} className="flex items-center gap-2">
-                        {isEditing ? (
+                        {isEditing && !isReserved ? (
                           <input
                             type="checkbox"
                             checked={isActive}
@@ -272,9 +273,13 @@ export function TerminalCapabilitiesTag({
                             className="h-3 w-3"
                           />
                         ) : (
-                          <div className={`h-3 w-3 rounded-sm border ${isActive ? 'bg-primary border-primary' : 'border-muted-foreground'}`} />
+                          <div className={`h-3 w-3 rounded-sm border ${
+                            isActive ? 'bg-primary border-primary' : 'border-muted-foreground'
+                          } ${isReserved ? 'opacity-50' : ''}`} />
                         )}
-                        <span className={`text-xs ${isActive ? 'font-medium' : 'text-muted-foreground'}`}>
+                        <span className={`text-xs ${
+                          isActive ? 'font-medium' : 'text-muted-foreground'
+                        } ${isReserved ? 'italic opacity-75' : ''}`}>
                           {desc}
                         </span>
                       </div>
