@@ -233,7 +233,7 @@ document.addEventListener("CustomTagsLoaded", (event: Event) => {
  * @returns Tag information or undefined if not found
  */
 export function getTagInfo(tagId: string): EmvTag | undefined {
-  return tagRegistry.get(tagId);
+  return tagRegistry.get(tagId.toUpperCase());
 }
 
 /**
@@ -243,11 +243,12 @@ export function getTagInfo(tagId: string): EmvTag | undefined {
  * @returns True if registered successfully, false if already exists
  */
 export function registerTag(tag: EmvTag): boolean {
-  if (tagRegistry.has(tag.id)) {
+  const key = tag.id.toUpperCase();
+  if (tagRegistry.has(key)) {
     return false;
   }
-
-  tagRegistry.set(tag.id, tag);
+  // Store under uppercase key to ensure case-insensitive lookups
+  tagRegistry.set(key, tag);
   return true;
 }
 
@@ -267,5 +268,5 @@ export function getAllTags(): EmvTag[] {
  * @returns True if the tag is registered
  */
 export function isTagRegistered(tagId: string): boolean {
-  return tagRegistry.has(tagId);
+  return tagRegistry.has(tagId.toUpperCase());
 }

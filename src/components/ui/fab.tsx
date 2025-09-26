@@ -38,6 +38,9 @@ interface FloatingActionButtonProps {
   onCopyResults?: () => void;
   onSave?: () => void;
   hasResults: boolean;
+  onUndo?: () => void;
+  canUndo?: boolean;
+  onRunInternalTests?: () => void;
 }
 
 export function FloatingActionButton({
@@ -47,6 +50,9 @@ export function FloatingActionButton({
   onCopyResults,
   onSave,
   hasResults,
+  onUndo,
+  canUndo,
+  onRunInternalTests,
 }: FloatingActionButtonProps): JSX.Element {
   const [isOpen, setIsOpen] = useState(false);
   const [errorDialogOpen, setErrorDialogOpen] = useState(false);
@@ -156,6 +162,18 @@ export function FloatingActionButton({
               <Save className="mr-2 h-4 w-4" />
               <span>Save Test</span>
             </DropdownMenuItem>
+            {onUndo && (
+              <DropdownMenuItem disabled={!canUndo} onClick={onUndo}>
+                <Code className="mr-2 h-4 w-4 rotate-180" />
+                <span>Undo Edit</span>
+              </DropdownMenuItem>
+            )}
+            {onRunInternalTests && (
+              <DropdownMenuItem onClick={onRunInternalTests}>
+                <Code className="mr-2 h-4 w-4" />
+                <span>Run Internal Tests</span>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem>
               <Settings className="mr-2 h-4 w-4" />
               <span>Settings</span>

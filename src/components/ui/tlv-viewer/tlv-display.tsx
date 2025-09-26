@@ -11,19 +11,32 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { tlvValueToAscii } from "@/utils/tlv";
 import { HelpCircle, Tag, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { CustomTagForm } from "@/components/ui/custom-tags";
-import { type CustomTagCreationParams, CustomTagDataFormat, DisplayFormat, LengthRuleType } from "@/types/custom-tag";
+import {
+  type CustomTagCreationParams,
+  CustomTagDataFormat,
+  DisplayFormat,
+  LengthRuleType,
+} from "@/types/custom-tag";
 import { db } from "@/utils/db/db";
+import { loadAndRegisterCustomTags } from "@/utils/tlv/load-custom-tags";
 
 interface TlvDisplayProps {
   result: TlvParsingResult | null;
   onRefresh?: () => void;
 }
 
-export function TlvDisplay({ result, onRefresh }: TlvDisplayProps): JSX.Element {
+export function TlvDisplay({
+  result,
+  onRefresh,
+}: TlvDisplayProps): JSX.Element {
   if (!result) {
     return (
       <div className="text-center p-8 text-muted-foreground">
@@ -39,7 +52,11 @@ export function TlvDisplay({ result, onRefresh }: TlvDisplayProps): JSX.Element 
         {result.elements.length > 0 ? (
           <div className="space-y-4">
             {result.elements.map((element, index) => (
-              <TlvElementCard key={index} element={element} onRefresh={onRefresh} />
+              <TlvElementCard
+                key={index}
+                element={element}
+                onRefresh={onRefresh}
+              />
             ))}
           </div>
         ) : (
@@ -78,13 +95,15 @@ function TlvElementCard({
       ...tagParams,
       created: new Date(),
     });
-    
+
     // Refresh the display if provided
     if (onRefresh) {
       onRefresh();
     }
+    // Ensure runtime registry includes this tag immediately
+    await loadAndRegisterCustomTags();
   };
-  
+
   // Default values for the custom tag form based on the unknown tag
   const getInitialTagParams = (): Partial<CustomTagCreationParams> => {
     return {
@@ -100,13 +119,19 @@ function TlvElementCard({
       displayFormat: DisplayFormat.Hex,
     };
   };
-  
+
   return (
     <div style={{ marginLeft: paddingLeft }}>
-      <Card className={cn(
-        element.isUnknown ? "border-amber-500/30 bg-amber-50 dark:bg-amber-950/10" : "",
-        element.tagInfo?.isPropriety ? "border-blue-500/30 bg-blue-50 dark:bg-blue-950/10" : ""
-      )}>
+      <Card
+        className={cn(
+          element.isUnknown
+            ? "border-amber-500/30 bg-amber-50 dark:bg-amber-950/10"
+            : "",
+          element.tagInfo?.isPropriety
+            ? "border-blue-500/30 bg-blue-50 dark:bg-blue-950/10"
+            : ""
+        )}
+      >
         <CardHeader className="py-4">
           <CardTitle className="text-base flex items-center justify-between">
             <span className="flex items-center gap-1">
@@ -115,15 +140,18 @@ function TlvElementCard({
                 <span className="text-foreground">{element.tagInfo.name}</span>
               ) : (
                 <div className="flex items-center gap-1">
-                  <Badge variant="outline" className="ml-1 text-xs gap-1 px-1 border-amber-500 text-amber-500">
+                  <Badge
+                    variant="outline"
+                    className="ml-1 text-xs gap-1 px-1 border-amber-500 text-amber-500"
+                  >
                     <HelpCircle className="h-3 w-3" /> Unknown
                   </Badge>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-5 w-5 rounded-full" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 rounded-full"
                         onClick={(e) => {
                           e.stopPropagation();
                           setDefineTagOpen(true);
@@ -138,17 +166,21 @@ function TlvElementCard({
                   </Tooltip>
                 </div>
               )}
-              
               {/* Show custom tag indicator if this is a custom tag */}
               {element.tagInfo?.isPropriety && (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Badge variant="outline" className="ml-1 text-xs gap-1 px-1 border-blue-500 text-blue-500">
+                    <Badge
+                      variant="outline"
+                      className="ml-1 text-xs gap-1 px-1 border-blue-500 text-blue-500"
+                    >
                       <Tag className="h-3 w-3" /> Custom
                     </Badge>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p className="text-xs">This is a custom or proprietary tag</p>
+                    <p className="text-xs">
+                      This is a custom or proprietary tag
+                    </p>
                   </TooltipContent>
                 </Tooltip>
               )}
@@ -203,7 +235,7 @@ function TlvElementCard({
           )}
         </CardContent>
       </Card>
-      
+
       {/* Custom Tag Definition Dialog */}
       {element.isUnknown && defineTagOpen && (
         <CustomTagForm

@@ -7,18 +7,21 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Copy, MoreHorizontal, TagIcon, FileText } from "lucide-react";
+import { Copy, MoreHorizontal, TagIcon, FileText, Edit3 } from "lucide-react";
 
 export interface TagActionsMenuProps {
   tag: string;
   value: string;
   path?: string;
+  /** Optional callback invoked when the user selects Edit Value */
+  onEdit?: () => void;
 }
 
 export function TagActionsMenu({
   tag,
   value,
   path: _path,
+  onEdit,
 }: TagActionsMenuProps) {
   const [open, setOpen] = useState(false);
 
@@ -40,6 +43,11 @@ export function TagActionsMenu({
     setOpen(false);
   };
 
+  const handleEdit = () => {
+    setOpen(false);
+    if (onEdit) onEdit();
+  };
+
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
@@ -52,6 +60,13 @@ export function TagActionsMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuItem onClick={handleEdit}>
+          <Edit3 className="mr-2 h-4 w-4" />
+          <span>Edit Value</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          {/* Separator visual grouping - copy actions below */}
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={handleCopyTag}>
           <TagIcon className="mr-2 h-4 w-4" />
           <span>Copy Tag</span>

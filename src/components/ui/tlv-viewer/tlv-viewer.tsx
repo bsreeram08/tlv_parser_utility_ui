@@ -5,11 +5,12 @@
  * to provide a complete TLV parsing and viewing experience.
  */
 
-import { useState, type JSX, useCallback } from "react";
+import { useState, type JSX, useCallback, useEffect } from "react";
 import { sanitizeSelectValues } from "@/utils/select-helpers";
 import { TlvInput } from "./tlv-input";
 import { CompactTlvDisplay } from "./compact-tlv-display";
 import { type TlvParsingResult, parseTlv, formatTlvAsJson } from "@/utils/tlv";
+import { editTlvValue } from "@/utils/tlv/tlv-edit";
 import {
   Card,
   CardContent,
@@ -29,6 +30,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Save, FolderOpen, HelpCircle } from "lucide-react";
 import { base64ToBase16 } from "@/utils/base64-hex";
+import { runTlvEditTests } from "@/tests/tlv-edit.test";
 
 // Example TLV data for demonstration
 const EXAMPLE_TLV_DATA =
@@ -40,11 +42,43 @@ export function TlvViewer(): JSX.Element {
   const [inputHex, setInputHex] = useState<string>("");
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [showUnknownTags, setShowUnknownTags] = useState(true);
+  const [undoStack, setUndoStack] = useState<string[]>([]); // previous raw hex values
+  const [lastEditedPath, setLastEditedPath] = useState<string | null>(null);
+
+  // Load last input & prefs on mount
+  useEffect(() => {
+    // Initialization only
+    if (!parseResult && !inputHex) {
+      try {
+        const last = localStorage.getItem("lastTlvInput");
+        if (last) {
+          setInputHex(last);
+          handleParse(last);
+        }
+        const pref = localStorage.getItem("showUnknownTags");
+        if (pref) setShowUnknownTags(pref === "true");
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [parseResult, inputHex]);
+
+  useEffect(() => {
+    const listener = () => {
+      if (inputHex) {
+        handleParse(inputHex);
+        toast.info("Custom tag registry updated; view refreshed");
+      }
+    };
+    document.addEventListener("CustomTagRegistryUpdated", listener);
+    return () =>
+      document.removeEventListener("CustomTagRegistryUpdated", listener);
+  }, [inputHex]);
 
   /**
    * Handle parsing of TLV data
    */
-  const handleParse = (hexString: string): void => {
+  function handleParse(hexString: string): void {
     setInputHex(hexString);
 
     try {
@@ -71,13 +105,19 @@ export function TlvViewer(): JSX.Element {
 
       // Switch to the results tab
       setActiveTab("results");
+      // persist last input
+      try {
+        localStorage.setItem("lastTlvInput", hexString);
+      } catch (e) {
+        // ignore
+      }
     } catch (error) {
       toast.error(
         "Failed to parse TLV data: " +
           (error instanceof Error ? error.message : String(error))
       );
     }
-  };
+  }
 
   /**
    * Save the current TLV test to the database
@@ -166,6 +206,67 @@ export function TlvViewer(): JSX.Element {
         .catch(() => toast.error("Failed to copy results"));
     }
   }, [parseResult]);
+
+  /**
+   * Edit a specific element's value by path (colon-separated) and reparse
+   */
+  const handleEditElement = useCallback(
+    (path: string, newValueHex: string) => {
+      if (!parseResult) {
+        toast.error("No parse result available to edit");
+        return;
+      }
+      const originalRaw = parseResult.rawHex;
+      let newRaw: string;
+      try {
+        newRaw = editTlvValue(parseResult.rawHex, path, newValueHex);
+      } catch (e) {
+        toast.error(
+          `Edit failed: ${e instanceof Error ? e.message : String(e)}`
+        );
+        return;
+      }
+
+      // Update input and reparse
+      setUndoStack((prev) => {
+        const next = [...prev, originalRaw];
+        // limit stack size
+        if (next.length > 20) next.shift();
+        return next;
+      });
+      setInputHex(newRaw);
+      handleParse(newRaw);
+      toast.success(`Updated ${path}`);
+      setLastEditedPath(path);
+      // auto-clear highlight after 4s
+      setTimeout(() => setLastEditedPath((p) => (p === path ? null : p)), 4000);
+    },
+    [parseResult]
+  );
+
+  const handleUndo = useCallback(() => {
+    setUndoStack((prev) => {
+      if (prev.length === 0) return prev;
+      const copy = [...prev];
+      const last = copy.pop() as string;
+      setInputHex(last);
+      handleParse(last);
+      toast.success("Reverted last edit");
+      return copy;
+    });
+  }, []);
+
+  const handleRunInternalTests = useCallback(() => {
+    try {
+      const msg = runTlvEditTests();
+      toast.success(msg);
+    } catch (e) {
+      toast.error(
+        "Internal tests failed: " + (e instanceof Error ? e.message : String(e))
+      );
+      console.error(e);
+    }
+  }, []);
 
   /**
    * Export results as JSON
@@ -297,7 +398,17 @@ export function TlvViewer(): JSX.Element {
                       <Switch
                         id="show-unknown-tags"
                         checked={showUnknownTags}
-                        onCheckedChange={setShowUnknownTags}
+                        onCheckedChange={(v) => {
+                          setShowUnknownTags(v);
+                          try {
+                            localStorage.setItem(
+                              "showUnknownTags",
+                              v ? "true" : "false"
+                            );
+                          } catch (e) {
+                            /* ignore */
+                          }
+                        }}
                       />
                       <Label htmlFor="show-unknown-tags">
                         Show Unknown Tags
@@ -337,6 +448,8 @@ export function TlvViewer(): JSX.Element {
                       : filterUnknownTags(parseResult)
                   }
                   onRefresh={() => handleParse(inputHex)}
+                  onEditElement={handleEditElement}
+                  highlightPath={lastEditedPath || undefined}
                 />
               </>
             </TabsContent>
@@ -352,6 +465,9 @@ export function TlvViewer(): JSX.Element {
         onCopyResults={handleCopyResults}
         onExportJson={handleExportJson}
         onSave={() => setSaveDialogOpen(true)}
+        onUndo={undoStack.length > 0 ? handleUndo : undefined}
+        canUndo={undoStack.length > 0}
+        onRunInternalTests={handleRunInternalTests}
       />
 
       {/* Save Dialog */}

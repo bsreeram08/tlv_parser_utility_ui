@@ -4,7 +4,7 @@
  * A component that provides side-by-side comparison of two TLV data streams
  */
 
-import { useState, type JSX } from "react";
+import { useState, useEffect, type JSX } from "react";
 
 // Define TLV format type
 type TlvFormat = "hex" | "base64" | "unknown";
@@ -66,7 +66,7 @@ export function TlvComparison(): JSX.Element {
   const [activeTab, setActiveTab] = useState<string>("input");
   const [showUnknownTags, setShowUnknownTags] = useState(true);
   const [expandAll, setExpandAll] = useState(false);
-  const [viewMode, setViewMode] = useState<'side-by-side' | 'table'>('table');
+  const [viewMode, setViewMode] = useState<"side-by-side" | "table">("table");
 
   /**
    * Check if a string is a non-empty string
@@ -159,13 +159,14 @@ export function TlvComparison(): JSX.Element {
     format: TlvFormat;
   }): void => {
     let hexString = data.value;
-    const format = data.format !== "unknown" ? data.format : detectFormat(data.value);
-    
+    const format =
+      data.format !== "unknown" ? data.format : detectFormat(data.value);
+
     // Convert base64 to hex if needed
     if (format === "base64") {
       hexString = convertBase64ToHex(data.value);
     }
-    
+
     setLeftInputHex(data.value);
     setLeftFormat(format);
 
@@ -211,13 +212,14 @@ export function TlvComparison(): JSX.Element {
     format: TlvFormat;
   }): void => {
     let hexString = data.value;
-    const format = data.format !== "unknown" ? data.format : detectFormat(data.value);
-    
+    const format =
+      data.format !== "unknown" ? data.format : detectFormat(data.value);
+
     // Convert base64 to hex if needed
     if (format === "base64") {
       hexString = convertBase64ToHex(data.value);
     }
-    
+
     setRightInputHex(data.value);
     setRightFormat(format);
 
@@ -320,40 +322,66 @@ export function TlvComparison(): JSX.Element {
   const createSyncedComparison = () => {
     const leftElements = filterUnknownTags(leftParseResult)?.elements || [];
     const rightElements = filterUnknownTags(rightParseResult)?.elements || [];
-    
+
     // Get all unique tags from both sides
     const allTags = new Set([
-      ...leftElements.map(el => el.tag),
-      ...rightElements.map(el => el.tag)
+      ...leftElements.map((el) => el.tag),
+      ...rightElements.map((el) => el.tag),
     ]);
-    
+
     // Create comparison pairs
-    const syncedPairs = Array.from(allTags).sort().map(tag => {
-      const leftElement = leftElements.find(el => el.tag === tag);
-      const rightElement = rightElements.find(el => el.tag === tag);
-      
-      let status: 'match' | 'different' | 'missing-left' | 'missing-right' = 'match';
-      
-      if (!leftElement) {
-        status = 'missing-left';
-      } else if (!rightElement) {
-        status = 'missing-right';
-      } else if (leftElement.value !== rightElement.value) {
-        status = 'different';
-      }
-      
-      return {
-        tag,
-        left: leftElement,
-        right: rightElement,
-        status
-      };
-    });
-    
+    const syncedPairs = Array.from(allTags)
+      .sort()
+      .map((tag) => {
+        const leftElement = leftElements.find((el) => el.tag === tag);
+        const rightElement = rightElements.find((el) => el.tag === tag);
+
+        let status: "match" | "different" | "missing-left" | "missing-right" =
+          "match";
+
+        if (!leftElement) {
+          status = "missing-left";
+        } else if (!rightElement) {
+          status = "missing-right";
+        } else if (leftElement.value !== rightElement.value) {
+          status = "different";
+        }
+
+        return {
+          tag,
+          left: leftElement,
+          right: rightElement,
+          status,
+        };
+      });
+
     return syncedPairs;
   };
 
   const syncedPairs = createSyncedComparison();
+
+  // Re-parse when custom tag registry updates so names & metadata refresh
+  useEffect(() => {
+    const listener = () => {
+      if (leftParseResult) {
+        handleLeftParse({ value: leftInputHex, format: leftFormat });
+      }
+      if (rightParseResult) {
+        handleRightParse({ value: rightInputHex, format: rightFormat });
+      }
+    };
+    document.addEventListener("CustomTagRegistryUpdated", listener);
+    return () =>
+      document.removeEventListener("CustomTagRegistryUpdated", listener);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    leftParseResult,
+    rightParseResult,
+    leftInputHex,
+    rightInputHex,
+    leftFormat,
+    rightFormat,
+  ]);
 
   return (
     <>
@@ -382,11 +410,13 @@ export function TlvComparison(): JSX.Element {
                     checked={showUnknownTags}
                     onCheckedChange={setShowUnknownTags}
                   />
-                  <Label htmlFor="show-unknown-tags" className="text-sm whitespace-nowrap">
+                  <Label
+                    htmlFor="show-unknown-tags"
+                    className="text-sm whitespace-nowrap"
+                  >
                     Show unknown
                   </Label>
                 </div>
-
 
                 <div className="flex items-center space-x-2">
                   <Switch
@@ -394,7 +424,10 @@ export function TlvComparison(): JSX.Element {
                     checked={expandAll}
                     onCheckedChange={setExpandAll}
                   />
-                  <Label htmlFor="expand-all" className="text-sm whitespace-nowrap">
+                  <Label
+                    htmlFor="expand-all"
+                    className="text-sm whitespace-nowrap"
+                  >
                     Expand all
                   </Label>
                 </div>
@@ -402,25 +435,30 @@ export function TlvComparison(): JSX.Element {
                 <div className="flex items-center space-x-2">
                   <Switch
                     id="table-view"
-                    checked={viewMode === 'table'}
-                    onCheckedChange={(checked) => setViewMode(checked ? 'table' : 'side-by-side')}
+                    checked={viewMode === "table"}
+                    onCheckedChange={(checked) =>
+                      setViewMode(checked ? "table" : "side-by-side")
+                    }
                   />
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Label htmlFor="table-view" className="text-sm whitespace-nowrap cursor-help">
+                        <Label
+                          htmlFor="table-view"
+                          className="text-sm whitespace-nowrap cursor-help"
+                        >
                           Table view
                         </Label>
                       </TooltipTrigger>
                       <TooltipContent>
                         <p className="text-sm max-w-xs">
-                          Toggle between simple table view and expanded side-by-side view with custom tag renderers
+                          Toggle between simple table view and expanded
+                          side-by-side view with custom tag renderers
                         </p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                 </div>
-
 
                 <div className="flex items-center gap-2">
                   <Button
@@ -449,7 +487,9 @@ export function TlvComparison(): JSX.Element {
                 {/* Left Input */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center mb-2">
-                    <Label className="text-base font-semibold">Source TLV</Label>
+                    <Label className="text-base font-semibold">
+                      Source TLV
+                    </Label>
                     {leftFormat !== "unknown" && (
                       <Badge variant="outline" className="font-mono">
                         {leftFormat.toUpperCase()} detected
@@ -470,7 +510,9 @@ export function TlvComparison(): JSX.Element {
                 {/* Right Input */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center mb-2">
-                    <Label className="text-base font-semibold">Target TLV</Label>
+                    <Label className="text-base font-semibold">
+                      Target TLV
+                    </Label>
                     {rightFormat !== "unknown" && (
                       <Badge variant="outline" className="font-mono">
                         {rightFormat.toUpperCase()} detected
@@ -490,22 +532,28 @@ export function TlvComparison(): JSX.Element {
               </div>
 
               <div className="flex justify-center mt-4">
-                <Button 
+                <Button
                   onClick={() => {
                     // Parse both TLV inputs simultaneously
                     if (leftInputHex) {
                       const leftDetectedFormat = detectFormat(leftInputHex);
                       if (leftDetectedFormat !== "unknown") {
-                        handleLeftParse({ value: leftInputHex, format: leftDetectedFormat });
+                        handleLeftParse({
+                          value: leftInputHex,
+                          format: leftDetectedFormat,
+                        });
                       } else {
                         toast.error("Invalid format detected in Source TLV");
                       }
                     }
-                    
+
                     if (rightInputHex) {
                       const rightDetectedFormat = detectFormat(rightInputHex);
                       if (rightDetectedFormat !== "unknown") {
-                        handleRightParse({ value: rightInputHex, format: rightDetectedFormat });
+                        handleRightParse({
+                          value: rightInputHex,
+                          format: rightDetectedFormat,
+                        });
                       } else {
                         toast.error("Invalid format detected in Target TLV");
                       }
@@ -520,7 +568,7 @@ export function TlvComparison(): JSX.Element {
 
             {/* Results Tab Content */}
             <TabsContent value="results" className="mt-4">
-              {viewMode === 'table' ? (
+              {viewMode === "table" ? (
                 /* Table View */
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
@@ -529,34 +577,54 @@ export function TlvComparison(): JSX.Element {
                       {syncedPairs.length} tag(s) compared
                     </div>
                   </div>
-                  
+
                   <div className="border rounded-lg overflow-hidden">
                     <table className="w-full">
                       <thead>
                         <tr className="border-b bg-muted/50">
-                          <th className="px-4 py-3 text-left font-medium">Tag</th>
-                          <th className="px-4 py-3 text-left font-medium">Name</th>
-                          <th className="px-4 py-3 text-left font-medium">{leftName}</th>
-                          <th className="px-4 py-3 text-left font-medium">{rightName}</th>
-                          <th className="px-4 py-3 text-left font-medium">Status</th>
+                          <th className="px-4 py-3 text-left font-medium">
+                            Tag
+                          </th>
+                          <th className="px-4 py-3 text-left font-medium">
+                            Name
+                          </th>
+                          <th className="px-4 py-3 text-left font-medium">
+                            {leftName}
+                          </th>
+                          <th className="px-4 py-3 text-left font-medium">
+                            {rightName}
+                          </th>
+                          <th className="px-4 py-3 text-left font-medium">
+                            Status
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
                         {syncedPairs.map((pair, index) => (
-                          <tr key={pair.tag} className={`border-b hover:bg-muted/25 ${
-                            index % 2 === 0 ? 'bg-muted/10' : ''
-                          }`}>
-                            <td className="px-4 py-3 font-mono text-sm">{pair.tag}</td>
+                          <tr
+                            key={pair.tag}
+                            className={`border-b hover:bg-muted/25 ${
+                              index % 2 === 0 ? "bg-muted/10" : ""
+                            }`}
+                          >
+                            <td className="px-4 py-3 font-mono text-sm">
+                              {pair.tag}
+                            </td>
                             <td className="px-4 py-3 text-sm">
-                              {pair.left?.tagInfo?.name || pair.right?.tagInfo?.name || 'Unknown'}
+                              {pair.left?.tagInfo?.name ||
+                                pair.right?.tagInfo?.name ||
+                                "Unknown"}
                             </td>
                             <td className="px-4 py-3">
                               {pair.left ? (
                                 <div className="space-y-1">
-                                  <div className="font-mono text-xs break-all">{pair.left.value}</div>
+                                  <div className="font-mono text-xs break-all">
+                                    {pair.left.value}
+                                  </div>
                                   <div className="text-xs text-muted-foreground">
                                     {pair.left.length} bytes
-                                    {pair.left.tagInfo?.valueType === 'text' && (
+                                    {pair.left.tagInfo?.valueType ===
+                                      "text" && (
                                       <span className="ml-2">
                                         ({tlvValueToAscii(pair.left.value)})
                                       </span>
@@ -564,16 +632,21 @@ export function TlvComparison(): JSX.Element {
                                   </div>
                                 </div>
                               ) : (
-                                <span className="text-sm text-muted-foreground italic">Not present</span>
+                                <span className="text-sm text-muted-foreground italic">
+                                  Not present
+                                </span>
                               )}
                             </td>
                             <td className="px-4 py-3">
                               {pair.right ? (
                                 <div className="space-y-1">
-                                  <div className="font-mono text-xs break-all">{pair.right.value}</div>
+                                  <div className="font-mono text-xs break-all">
+                                    {pair.right.value}
+                                  </div>
                                   <div className="text-xs text-muted-foreground">
                                     {pair.right.length} bytes
-                                    {pair.right.tagInfo?.valueType === 'text' && (
+                                    {pair.right.tagInfo?.valueType ===
+                                      "text" && (
                                       <span className="ml-2">
                                         ({tlvValueToAscii(pair.right.value)})
                                       </span>
@@ -581,19 +654,28 @@ export function TlvComparison(): JSX.Element {
                                   </div>
                                 </div>
                               ) : (
-                                <span className="text-sm text-muted-foreground italic">Not present</span>
+                                <span className="text-sm text-muted-foreground italic">
+                                  Not present
+                                </span>
                               )}
                             </td>
                             <td className="px-4 py-3">
-                              <span className={`text-xs px-2 py-1 rounded ${
-                                pair.status === 'match' ? 'bg-green-100 text-green-800' :
-                                pair.status === 'different' ? 'bg-orange-100 text-orange-800' :
-                                'bg-red-100 text-red-800'
-                              }`}>
-                                {pair.status === 'match' ? 'Match' :
-                                 pair.status === 'different' ? 'Different' :
-                                 pair.status === 'missing-left' ? 'Missing Left' :
-                                 'Missing Right'}
+                              <span
+                                className={`text-xs px-2 py-1 rounded ${
+                                  pair.status === "match"
+                                    ? "bg-green-100 text-green-800"
+                                    : pair.status === "different"
+                                    ? "bg-orange-100 text-orange-800"
+                                    : "bg-red-100 text-red-800"
+                                }`}
+                              >
+                                {pair.status === "match"
+                                  ? "Match"
+                                  : pair.status === "different"
+                                  ? "Different"
+                                  : pair.status === "missing-left"
+                                  ? "Missing Left"
+                                  : "Missing Right"}
                               </span>
                             </td>
                           </tr>
@@ -617,7 +699,10 @@ export function TlvComparison(): JSX.Element {
                       <CompactTlvDisplay
                         result={filterUnknownTags(leftParseResult)}
                         onRefresh={() =>
-                          handleLeftParse({ value: leftInputHex, format: leftFormat })
+                          handleLeftParse({
+                            value: leftInputHex,
+                            format: leftFormat,
+                          })
                         }
                         expandAll={expandAll}
                       />
@@ -636,7 +721,10 @@ export function TlvComparison(): JSX.Element {
                       <CompactTlvDisplay
                         result={filterUnknownTags(rightParseResult)}
                         onRefresh={() =>
-                          handleRightParse({ value: rightInputHex, format: rightFormat })
+                          handleRightParse({
+                            value: rightInputHex,
+                            format: rightFormat,
+                          })
                         }
                         expandAll={expandAll}
                       />
@@ -666,8 +754,10 @@ export function TlvComparison(): JSX.Element {
           size="icon"
           className="rounded-full"
           onClick={() => {
-            if (leftParseResult) handleLeftParse({ value: leftInputHex, format: leftFormat });
-            if (rightParseResult) handleRightParse({ value: rightInputHex, format: rightFormat });
+            if (leftParseResult)
+              handleLeftParse({ value: leftInputHex, format: leftFormat });
+            if (rightParseResult)
+              handleRightParse({ value: rightInputHex, format: rightFormat });
           }}
           title="Refresh Both"
         >

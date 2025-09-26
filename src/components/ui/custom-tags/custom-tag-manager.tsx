@@ -38,6 +38,7 @@ import {
 import { CustomTagForm } from "./custom-tag-form";
 import { db } from "@/utils/db/db";
 import { toast } from "sonner";
+import { loadAndRegisterCustomTags } from "@/utils/tlv/load-custom-tags";
 import { Search, Plus, MoreVertical, Edit, Trash2, Tag } from "lucide-react";
 import {
   LengthRuleType,
@@ -108,6 +109,8 @@ export function CustomTagManager(): JSX.Element {
     };
 
     await db.addCustomTag(newTag);
+    // Register newly added tag in runtime registry
+    await loadAndRegisterCustomTags();
     await loadTags();
   };
 
@@ -123,6 +126,8 @@ export function CustomTagManager(): JSX.Element {
     };
 
     await db.updateCustomTag(updatedTag);
+    // Re-register tags after update
+    await loadAndRegisterCustomTags();
     await loadTags();
   };
 

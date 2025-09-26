@@ -15,7 +15,23 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Tooltip,
   TooltipContent,
@@ -23,39 +39,39 @@ import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronRight, HelpCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { tlvValueToAscii } from "@/utils/tlv";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { HelpCircle, ChevronDown, ChevronRight } from "lucide-react";
 import { CustomTagForm } from "@/components/ui/custom-tags";
+import { TagActionsMenu } from "@/components/ui/tlv-tags/tag-actions-menu";
+import { db } from "@/utils/db/db";
+import { loadAndRegisterCustomTags } from "@/utils/tlv/load-custom-tags";
+import {
+  hasCustomRenderer,
+  getTagRenderer,
+} from "@/components/ui/tlv-tags/tag-registry";
+import { tlvValueToAscii } from "@/utils/tlv";
 import {
   type CustomTagCreationParams,
   CustomTagDataFormat,
   DisplayFormat,
   LengthRuleType,
 } from "@/types/custom-tag";
-import { db } from "@/utils/db/db";
-import {
-  hasCustomRenderer,
-  getTagRenderer,
-} from "@/components/ui/tlv-tags/tag-registry";
-import { TagActionsMenu } from "@/components/ui/tlv-tags/tag-actions-menu";
 
 interface CompactTlvDisplayProps {
   result: TlvParsingResult | null;
   onRefresh?: () => void;
   expandAll?: boolean;
+  /** Optional callback to request editing a specific element. Signature: (path, newHex) */
+  onEditElement?: (path: string, newValueHex: string) => void;
+  /** Optional path of element recently edited to highlight */
+  highlightPath?: string;
 }
 
 export function CompactTlvDisplay({
   result,
   onRefresh,
   expandAll: externalExpandAll,
+  onEditElement,
+  highlightPath,
 }: CompactTlvDisplayProps): JSX.Element {
   const [internalExpandAll, setInternalExpandAll] = useState(false);
 
@@ -117,6 +133,8 @@ export function CompactTlvDisplay({
                 path={element.tag}
                 isOpen={expandAll || isOpen}
                 setIsOpen={setIsOpen}
+                onEditElement={onEditElement}
+                highlightPath={highlightPath}
               />
             );
           })}
@@ -133,6 +151,8 @@ interface CompactTlvElementProps {
   path?: string;
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
+  onEditElement?: (path: string, newValueHex: string) => void;
+  highlightPath?: string;
 }
 
 function CompactTlvElement({
@@ -142,9 +162,13 @@ function CompactTlvElement({
   isOpen,
   setIsOpen,
   path = "",
+  onEditElement,
+  highlightPath,
 }: CompactTlvElementProps): JSX.Element {
   const [defineTagOpen, setDefineTagOpen] = useState(false);
   const [activeValueTab, setActiveValueTab] = useState<string>("hex");
+  const [editOpen, setEditOpen] = useState(false);
+  const [editValue, setEditValue] = useState(element.value || "");
 
   // Try to display ASCII representation for primitive values
   const displayValue = element.value;
@@ -167,6 +191,8 @@ function CompactTlvElement({
     if (onRefresh) {
       onRefresh();
     }
+    // Register newly added tag in runtime registry
+    await loadAndRegisterCustomTags();
   };
 
   // Default values for the custom tag form based on the unknown tag
@@ -205,7 +231,12 @@ function CompactTlvElement({
   };
 
   return (
-    <div className="rounded border relative">
+    <div
+      className={cn(
+        "rounded border relative transition-colors",
+        highlightPath === path && "ring-2 ring-primary/60 border-primary/60"
+      )}
+    >
       {/* Position the actions menu outside the button to avoid nesting issues */}
       <div className="absolute top-2 right-2 z-10 flex items-center space-x-1">
         {element.isUnknown && (
@@ -231,6 +262,7 @@ function CompactTlvElement({
           tag={element.tag}
           value={element.value}
           path={path || element.tag}
+          onEdit={() => setEditOpen(true)}
         />
       </div>
 
@@ -372,6 +404,8 @@ function CompactTlvElement({
                         path={childPath}
                         isOpen={isOpen}
                         setIsOpen={setIsOpen}
+                        onEditElement={onEditElement}
+                        highlightPath={highlightPath}
                       />
                     );
                   })}
@@ -393,6 +427,121 @@ function CompactTlvElement({
           initialValues={getInitialTagParams()}
         />
       )}
+
+      {/* Edit Value Dialog (proper Dialog root) */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Value: {element.tag}</DialogTitle>
+            <DialogDescription>
+              Enter new hex value for this tag (no spaces)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2 space-y-3">
+            <input
+              className="w-full bg-muted p-2 rounded font-mono"
+              value={editValue}
+              onChange={(e) =>
+                setEditValue(
+                  e.target.value.replace(/[^0-9a-fA-F]/g, "").toUpperCase()
+                )
+              }
+              placeholder="Hex value"
+              autoFocus
+            />
+            {/* Preview section */}
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">
+                Preview (Tag + Length + Value)
+              </div>
+              <div className="flex items-start gap-2">
+                <div className="flex-1 bg-muted p-2 rounded font-mono text-xs break-all">
+                  {(() => {
+                    const newLen = Math.floor((editValue || "").length / 2);
+                    const toHex = (n: number, width = 2) =>
+                      n.toString(16).toUpperCase().padStart(width, "0");
+                    let newLengthField = "";
+                    if (newLen < 0x80) {
+                      newLengthField = toHex(newLen, 2);
+                    } else {
+                      const bytes: number[] = [];
+                      let tmp = newLen;
+                      while (tmp > 0) {
+                        bytes.unshift(tmp & 0xff);
+                        tmp >>= 8;
+                      }
+                      newLengthField =
+                        toHex(0x80 | bytes.length, 2) +
+                        bytes.map((b) => toHex(b, 2)).join("");
+                    }
+                    return `${element.tag}${newLengthField}${editValue || ""}`;
+                  })()}
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    const preview = (() => {
+                      const newLen = Math.floor((editValue || "").length / 2);
+                      const toHex = (n: number, width = 2) =>
+                        n.toString(16).toUpperCase().padStart(width, "0");
+                      let newLengthField = "";
+                      if (newLen < 0x80) {
+                        newLengthField = toHex(newLen, 2);
+                      } else {
+                        const bytes: number[] = [];
+                        let tmp = newLen;
+                        while (tmp > 0) {
+                          bytes.unshift(tmp & 0xff);
+                          tmp >>= 8;
+                        }
+                        newLengthField =
+                          toHex(0x80 | bytes.length, 2) +
+                          bytes.map((b) => toHex(b, 2)).join("");
+                      }
+                      return `${element.tag}${newLengthField}${
+                        editValue || ""
+                      }`;
+                    })();
+                    navigator.clipboard
+                      .writeText(preview)
+                      .then(() => toast.success("Preview copied"))
+                      .catch(() => toast.error("Copy failed"));
+                  }}
+                >
+                  Copy
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (
+                  !/^[0-9A-F]*$/.test(editValue) ||
+                  editValue.length % 2 !== 0
+                ) {
+                  toast.error(
+                    "Invalid hex value. Ensure only hex digits and even length."
+                  );
+                  return;
+                }
+                if (onEditElement) {
+                  onEditElement(path || element.tag, editValue);
+                } else if (onRefresh) {
+                  onRefresh();
+                }
+                setEditOpen(false);
+              }}
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
