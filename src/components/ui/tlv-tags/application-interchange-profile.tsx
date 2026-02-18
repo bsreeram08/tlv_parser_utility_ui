@@ -18,6 +18,7 @@ import {
 import { Copy, Edit3, Save, X, Info } from "lucide-react";
 import { toast } from "sonner";
 import { TagClass, TagFormat } from "@/types/tlv";
+import { parseHexToBytes, bytesToHex, isBitSet } from "@/utils/byte-utils";
 
 export const APPLICATION_INTERCHANGE_PROFILE = {
   tag: "82",
@@ -81,29 +82,9 @@ export function ApplicationInterchangeProfileTag({
   const [isEditing, setIsEditing] = useState(false);
   const [byteValues, setByteValues] = useState<number[]>([]);
 
-  // Parse hex value to bytes
-  const parseToBytes = (hexStr: string): number[] => {
-    const validHex = hexStr
-      .replace(/[^0-9A-Fa-f]/g, "")
-      .padEnd(4, "0")
-      .substring(0, 4);
-    
-    return [
-      parseInt(validHex.substring(0, 2), 16),
-      parseInt(validHex.substring(2, 4), 16),
-    ];
-  };
-
-  // Convert bytes back to hex
-  const bytesToHex = (bytes: number[]) => {
-    return bytes
-      .map(byte => byte.toString(16).padStart(2, "0").toUpperCase())
-      .join("");
-  };
-
   // Initialize byte values when the value prop changes
   useEffect(() => {
-    setByteValues(parseToBytes(value));
+    setByteValues(parseHexToBytes(value, 2));
   }, [value]);
 
   // Toggle a specific capability
@@ -120,7 +101,7 @@ export function ApplicationInterchangeProfileTag({
       .substring(0, 4)
       .toUpperCase();
     setHexValue(input);
-    setByteValues(parseToBytes(input));
+    setByteValues(parseHexToBytes(input, 2));
   };
 
   // Handle save
@@ -141,14 +122,14 @@ export function ApplicationInterchangeProfileTag({
   // Apply a predefined configuration
   const applyConfig = (configValue: string) => {
     setHexValue(configValue);
-    setByteValues(parseToBytes(configValue));
+    setByteValues(parseHexToBytes(configValue, 2));
   };
 
   // Get active capabilities for a byte
   const getActiveCapabilities = (byteIndex: number, capabilities: Record<number, string>) => {
     const byteVal = byteValues[byteIndex] || 0;
     return Object.entries(capabilities)
-      .filter(([mask]) => (byteVal & parseInt(mask)) !== 0)
+      .filter(([mask]) => isBitSet(byteVal, parseInt(mask)))
       .map(([, desc]) => desc);
   };
 

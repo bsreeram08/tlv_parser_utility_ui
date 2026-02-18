@@ -42,7 +42,6 @@ export function parseTlv(
   hexString: string,
   options: TlvParsingOptions = DEFAULT_OPTIONS
 ): TlvParsingResult {
-  console.log({ hexString, options });
   // Normalize input - remove spaces and convert to uppercase
   const normalizedHex = normalizeHexString(hexString);
 

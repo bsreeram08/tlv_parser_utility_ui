@@ -24,3 +24,10 @@ export {
   formatIso8583AsJson,
   type Iso8583FormattingOptions
 } from "./iso8583-formatter";
+
+// Export MTI description utilities
+export {
+  getMtiClassDescription,
+  getMtiFunctionDescription,
+  getMtiOriginDescription
+} from "./mti-descriptions";
