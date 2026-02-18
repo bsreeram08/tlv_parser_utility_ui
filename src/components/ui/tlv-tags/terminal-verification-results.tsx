@@ -18,6 +18,7 @@ import {
 import { Copy, Edit3, Save, X, Info } from "lucide-react";
 import { toast } from "sonner";
 import { TagClass, TagFormat } from "@/types/tlv";
+import { parseHexToBytes, bytesToHex, toggleBit, isBitSet } from "@/utils/byte-utils";
 
 export const TERMINAL_VERIFICATION_RESULTS = {
   tag: "95",
@@ -120,38 +121,15 @@ export function TerminalVerificationResultsTag({
   const [isEditing, setIsEditing] = useState(false);
   const [byteValues, setByteValues] = useState<number[]>([]);
 
-  // Parse hex value to bytes
-  const parseToBytes = (hexStr: string): number[] => {
-    const validHex = hexStr
-      .replace(/[^0-9A-Fa-f]/g, "")
-      .padEnd(10, "0")
-      .substring(0, 10);
-    
-    return [
-      parseInt(validHex.substring(0, 2), 16),
-      parseInt(validHex.substring(2, 4), 16),
-      parseInt(validHex.substring(4, 6), 16),
-      parseInt(validHex.substring(6, 8), 16),
-      parseInt(validHex.substring(8, 10), 16),
-    ];
-  };
-
-  // Convert bytes back to hex
-  const bytesToHex = (bytes: number[]) => {
-    return bytes
-      .map(byte => byte.toString(16).padStart(2, "0").toUpperCase())
-      .join("");
-  };
-
   // Initialize byte values when the value prop changes
   useEffect(() => {
-    setByteValues(parseToBytes(value));
+    setByteValues(parseHexToBytes(value, 5));
   }, [value]);
 
   // Toggle a specific verification status
   const toggleVerification = (byteIndex: number, bitMask: number) => {
     const newBytes = [...byteValues];
-    newBytes[byteIndex] ^= bitMask;
+    newBytes[byteIndex] = toggleBit(newBytes[byteIndex], bitMask);
     setByteValues(newBytes);
   };
 
@@ -162,7 +140,7 @@ export function TerminalVerificationResultsTag({
       .substring(0, 10)
       .toUpperCase();
     setHexValue(input);
-    setByteValues(parseToBytes(input));
+    setByteValues(parseHexToBytes(input, 5));
   };
 
   // Handle save
@@ -183,14 +161,14 @@ export function TerminalVerificationResultsTag({
   // Apply a predefined configuration
   const applyConfig = (configValue: string) => {
     setHexValue(configValue);
-    setByteValues(parseToBytes(configValue));
+    setByteValues(parseHexToBytes(configValue, 5));
   };
 
   // Get active verification issues for a byte
   const getActiveIssues = (byteIndex: number, verifications: Record<number, string>) => {
     const byteVal = byteValues[byteIndex] || 0;
     return Object.entries(verifications)
-      .filter(([mask]) => (byteVal & parseInt(mask)) !== 0)
+      .filter(([mask]) => isBitSet(byteVal, parseInt(mask)))
       .map(([, desc]) => desc);
   };
 

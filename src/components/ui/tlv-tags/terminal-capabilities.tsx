@@ -18,6 +18,7 @@ import {
 import { Copy, Edit3, Save, X, Info } from "lucide-react";
 import { toast } from "sonner";
 import { TagClass, TagFormat } from "@/types/tlv";
+import { parseHexToBytes, bytesToHex, toggleBit, isBitSet } from "@/utils/byte-utils";
 
 export const TERMINAL_CAPABILITIES = {
   tag: "9F33",
@@ -82,35 +83,15 @@ export function TerminalCapabilitiesTag({
   const [byteValues, setByteValues] = useState<number[]>([]);
 
   // Parse hex value to bytes
-  const parseToBytes = (hexStr: string): number[] => {
-    const validHex = hexStr
-      .replace(/[^0-9A-Fa-f]/g, "")
-      .padEnd(6, "0")
-      .substring(0, 6);
-    
-    return [
-      parseInt(validHex.substring(0, 2), 16),
-      parseInt(validHex.substring(2, 4), 16), 
-      parseInt(validHex.substring(4, 6), 16),
-    ];
-  };
-
-  // Convert bytes back to hex
-  const bytesToHex = (bytes: number[]) => {
-    return bytes
-      .map(byte => byte.toString(16).padStart(2, "0").toUpperCase())
-      .join("");
-  };
-
   // Initialize byte values when the value prop changes
   useEffect(() => {
-    setByteValues(parseToBytes(value));
+    setByteValues(parseHexToBytes(value, 3));
   }, [value]);
 
   // Toggle a specific capability
   const toggleCapability = (byteIndex: number, bitMask: number) => {
     const newBytes = [...byteValues];
-    newBytes[byteIndex] ^= bitMask;
+    newBytes[byteIndex] = toggleBit(newBytes[byteIndex], bitMask);
     setByteValues(newBytes);
   };
 
@@ -121,7 +102,7 @@ export function TerminalCapabilitiesTag({
       .substring(0, 6)
       .toUpperCase();
     setHexValue(input);
-    setByteValues(parseToBytes(input));
+    setByteValues(parseHexToBytes(input, 3));
   };
 
   // Handle save
@@ -142,14 +123,14 @@ export function TerminalCapabilitiesTag({
   // Apply a predefined configuration
   const applyConfig = (configValue: string) => {
     setHexValue(configValue);
-    setByteValues(parseToBytes(configValue));
+    setByteValues(parseHexToBytes(configValue, 3));
   };
 
   // Get active capabilities for a byte
   const getActiveCapabilities = (byteIndex: number, capabilities: Record<number, string>) => {
     const byteVal = byteValues[byteIndex] || 0;
     return Object.entries(capabilities)
-      .filter(([mask]) => (byteVal & parseInt(mask)) !== 0)
+      .filter(([mask]) => isBitSet(byteVal, parseInt(mask)))
       .map(([, desc]) => desc);
   };
 

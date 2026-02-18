@@ -13,6 +13,7 @@ import { AlertCircle, Copy, Trash } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { base16ToBase64, base64ToBase16, isValidHex as isValidHexFormat, isLikelyBase64 } from "@/utils/base64-hex";
 
 // Define TLV input format types
 type TlvFormat = "hex" | "base64" | "unknown";
@@ -35,18 +36,6 @@ export function TlvInput({
     return typeof value === "string" && value.length > 0;
   }
 
-  // Check if a string is valid hex (even length and only hex characters)
-  function isValidHex(value: string): boolean {
-    return (
-      /^[0-9A-Fa-f]*$/.test(value) && value.length % 2 === 0 && value.length > 0
-    );
-  }
-
-  // Check if a string might be Base64
-  function mightBeBase64(value: string): boolean {
-    return /^[A-Za-z0-9+/]*={0,2}$/.test(value) && value.length > 0;
-  }
-
   // Detect format without setting error
   function detectFormat(value: string): TlvFormat {
     // Safety check for non-string values
@@ -61,12 +50,12 @@ export function TlvInput({
     }
 
     // Check for hex format
-    if (isValidHex(trimmedValue)) {
+    if (isValidHexFormat(trimmedValue)) {
       return "hex";
     }
 
     // Check for Base64 format
-    if (mightBeBase64(trimmedValue)) {
+    if (isLikelyBase64(trimmedValue)) {
       try {
         // Attempt to decode to verify it's valid Base64
         window.atob(trimmedValue);
@@ -165,72 +154,18 @@ export function TlvInput({
     }
   }
 
-  // Simple and safe hex to base64 conversion
-  function convertHexToBase64(hex: string): string {
-    try {
-      if (!isNonEmptyString(hex)) {
-        throw new Error("Invalid hex input");
-      }
-
-      // Remove any spaces and ensure uppercase
-      const cleanHex = hex.replace(/\s/g, "").toUpperCase();
-
-      // Must be even length
-      if (cleanHex.length % 2 !== 0) {
-        throw new Error("Hex string must have an even number of characters");
-      }
-
-      // Create binary string
-      let binaryString = "";
-      for (let i = 0; i < cleanHex.length; i += 2) {
-        const byte = parseInt(cleanHex.substring(i, i + 2), 16);
-        binaryString += String.fromCharCode(byte);
-      }
-
-      // Convert to base64
-      return window.btoa(binaryString);
-    } catch (e) {
-      console.error("Hex to Base64 conversion failed:", e);
-      throw new Error("Failed to convert hex to Base64");
-    }
-  }
-
-  // Simple and safe base64 to hex conversion
-  function convertBase64ToHex(base64: string): string {
-    try {
-      if (!isNonEmptyString(base64)) {
-        throw new Error("Invalid Base64 input");
-      }
-
-      // Get binary string from base64
-      const binaryString = window.atob(base64);
-
-      // Convert to hex
-      let hex = "";
-      for (let i = 0; i < binaryString.length; i++) {
-        const byte = binaryString.charCodeAt(i);
-        hex += byte.toString(16).padStart(2, "0").toUpperCase();
-      }
-
-      return hex;
-    } catch (e) {
-      console.error("Base64 to hex conversion failed:", e);
-      throw new Error("Failed to convert Base64 to hex");
-    }
-  }
-
   // Switch between formats
   function toggleFormat(): void {
     if (!isNonEmptyString(inputValue)) return;
 
     try {
       if (detectedFormat === "hex") {
-        const base64 = convertHexToBase64(inputValue);
+        const base64 = base16ToBase64(inputValue);
         setInputValue(base64);
         setDetectedFormat("base64");
         setError(null);
       } else if (detectedFormat === "base64") {
-        const hex = convertBase64ToHex(inputValue);
+        const hex = base64ToBase16(inputValue);
         setInputValue(hex);
         setDetectedFormat("hex");
         setError(null);
