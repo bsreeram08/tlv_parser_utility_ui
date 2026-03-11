@@ -247,12 +247,15 @@ export function IsoDisplay({ result }: IsoDisplayProps): JSX.Element {
           <ScrollArea className="h-[calc(100vh-550px)]">
             {fieldCount > 0 ? (
               <>
-                <div className="mb-3 flex flex-wrap items-center gap-2">
+                <div
+                  className="mb-3 flex flex-wrap items-center gap-2"
+                  aria-live={fieldSearch ? "polite" : undefined}
+                >
                   <Badge variant="secondary">
                     Showing {filteredFields.length} of {fieldCount} fields
                   </Badge>
                   {fieldSearch && filteredFields.length > 0 && (
-                    <Badge variant="outline" aria-live="polite">
+                    <Badge variant="outline">
                       Filtered by “{fieldSearch}”
                     </Badge>
                   )}
@@ -311,7 +314,11 @@ function FieldAccordionItem({ field }: FieldAccordionItemProps): JSX.Element {
             <div className="flex items-center justify-between gap-2">
               <h4 className="text-sm font-medium">Value</h4>
               <span className="text-xs text-muted-foreground">
+                <span
+                  aria-label={`Field value length: ${field.value.length} characters`}
+                >
                 {field.value.length} characters
+                </span>
               </span>
             </div>
             <div className="bg-muted p-2 rounded font-mono text-xs break-all mt-1">
