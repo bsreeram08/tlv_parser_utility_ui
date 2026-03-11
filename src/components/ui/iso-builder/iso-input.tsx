@@ -132,9 +132,14 @@ export function IsoInput({
               <FormItem>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-2">
-                    <FormLabel>ISO 8583 Message</FormLabel>
+                    <FormLabel htmlFor="iso8583-message">
+                      ISO 8583 Message
+                    </FormLabel>
                     {trimmedMessage && (
-                      <Badge variant="outline">
+                      <Badge
+                        variant="outline"
+                        aria-label={`Message length: ${trimmedMessage.length} characters`}
+                      >
                         {trimmedMessage.length} characters
                       </Badge>
                     )}

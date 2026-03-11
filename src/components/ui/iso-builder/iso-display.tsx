@@ -198,6 +198,7 @@ export function IsoDisplay({ result }: IsoDisplayProps): JSX.Element {
                     value={fieldSearch}
                     onChange={(event) => setFieldSearch(event.target.value)}
                     placeholder="Search by field, name, or value..."
+                    aria-label="Search data elements"
                     className="w-full sm:w-72"
                   />
                   {fieldSearch && (
@@ -248,7 +249,9 @@ export function IsoDisplay({ result }: IsoDisplayProps): JSX.Element {
                     Showing {filteredFields.length} of {fieldCount} fields
                   </Badge>
                   {fieldSearch && filteredFields.length > 0 && (
-                    <Badge variant="outline">Filtered by “{fieldSearch}”</Badge>
+                    <Badge variant="outline" aria-live="polite">
+                      Filtered by “{fieldSearch}”
+                    </Badge>
                   )}
                 </div>
                 {filteredFields.length > 0 ? (
