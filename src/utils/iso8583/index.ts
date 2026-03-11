@@ -9,7 +9,7 @@
 export * from "@/types/iso8583";
 
 // Export parser functionality
-export { parseIso8583 } from "./iso8583-parser";
+export { parseIso8583, isSupportedIso8583Message } from "./iso8583-parser";
 
 // Export field registry functionality
 export { 

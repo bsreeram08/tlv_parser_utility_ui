@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Iso8583Version } from "@/types/iso8583";
+import { isSupportedIso8583Message } from "@/utils/iso8583";
 import {
   Form,
   FormControl,
@@ -74,18 +75,10 @@ export function IsoInput({
    * Validate ISO 8583 message
    */
   const validateMessage = (message: string): boolean => {
-    // Basic validation - minimum length and hex/numeric format for MTI
-    if (message.trim().length < 20) {
+    if (!isSupportedIso8583Message(message)) {
       setError(
-        "ISO 8583 message must be at least 20 characters (MTI + Primary Bitmap)"
+        "Enter a supported ISO 8583 message starting with a text MTI or a hex-encoded payload whose first 4 bytes decode to the MTI"
       );
-      return false;
-    }
-
-    // Check if MTI is 4 digits
-    const mti = message.trim().substring(0, 4);
-    if (!/^\d{4}$/.test(mti)) {
-      setError("MTI must be 4 digits");
       return false;
     }
 
@@ -117,13 +110,13 @@ export function IsoInput({
               <FormLabel>ISO 8583 Message</FormLabel>
               <FormControl>
                 <Textarea
-                  placeholder="Enter ISO 8583 message (e.g., 0100722000000000000004000000000000001234)"
+                  placeholder="Enter a text ISO 8583 message or a hex-encoded binary/EBCDIC payload"
                   className="font-mono h-36 resize-y"
                   {...field}
                 />
               </FormControl>
               <FormDescription>
-                Enter the full ISO 8583 message starting with the MTI
+                Supports plain-text ISO 8583 messages and hex-encoded payloads with ASCII or EBCDIC MTIs
               </FormDescription>
               <FormMessage />
             </FormItem>

@@ -94,6 +94,15 @@ function registerStandardFields(): void {
       contentFormat: "YYMM",
       description: "Card expiration date in YYMM format",
     },
+    {
+      id: 19,
+      name: "Acquiring Institution Country Code",
+      format: FieldFormat.NUMERIC,
+      length: 3,
+      lengthType: LengthType.FIXED,
+      description:
+        "Country code of the acquiring institution, typically represented using ISO 3166 numeric values",
+    },
   ];
 
   // Register all fields in the registry
@@ -131,6 +140,24 @@ function registerISO8583_1987Fields(): void {
       lengthType: LengthType.FIXED,
       description:
         "Terminal attendance, transaction status, and terminal location",
+    },
+    {
+      id: 26,
+      name: "Point of Service PIN Capture Code",
+      format: FieldFormat.NUMERIC,
+      length: 2,
+      lengthType: LengthType.FIXED,
+      description:
+        "Maximum PIN length accepted by the terminal for this transaction",
+    },
+    {
+      id: 27,
+      name: "Authorizing Identification Response Length",
+      format: FieldFormat.NUMERIC,
+      length: 1,
+      lengthType: LengthType.FIXED,
+      description:
+        "Length of the authorization identification response available in the message context",
     },
     {
       id: 32,
@@ -196,6 +223,7 @@ function registerISO8583_1987Fields(): void {
       format: FieldFormat.ALPHA_NUMERIC_SPECIAL,
       length: 40,
       lengthType: LengthType.FIXED,
+      maxLength: 99,
       description: "Name and location of the card acceptor",
     },
     {
@@ -224,6 +252,16 @@ function registerISO8583_1987Fields(): void {
       maxLength: 120,
       description:
         "Amounts associated with the transaction but separate from the transaction amount",
+    },
+    {
+      id: 55,
+      name: "ICC System Related Data",
+      format: FieldFormat.BINARY,
+      length: 999,
+      lengthType: LengthType.VARIABLE,
+      maxLength: 255,
+      description:
+        "Integrated circuit card data, often encoded as EMV TLV and carried as binary bytes",
     },
   ];
 

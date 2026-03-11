@@ -10,6 +10,7 @@
 
 import {
   type Bitmap,
+  FieldFormat,
   type Iso8583ParseError,
   type Iso8583ParseOptions,
   type Iso8583ParseResult,
@@ -21,6 +22,7 @@ import {
   MtiFunction,
   MtiOrigin,
 } from "@/types/iso8583";
+import { bytesToHex, isValidHex, normalizeHex } from "@/utils/byte-utils";
 import { getFieldDefinition } from "./field-registry";
 
 /**
@@ -34,6 +36,200 @@ const DEFAULT_PARSE_OPTIONS: Iso8583ParseOptions = {
   validateFields: true,
 };
 
+type TextEncoding = "ascii" | "ebcdic";
+
+type NormalizedIsoMessage =
+  | {
+      kind: "text";
+      data: string;
+    }
+  | {
+      kind: "binary";
+      data: Uint8Array;
+      textEncoding: TextEncoding;
+    };
+
+type FieldParseState = {
+  fields: Record<number, IsoField>;
+  position: number;
+  score: number;
+};
+
+type BinaryFieldCandidate = {
+  field: IsoField;
+  nextPos: number;
+  score: number;
+};
+
+const EBCDIC_SPECIAL_CHAR_MAP: Record<number, string> = {
+  0x40: " ",
+  0x4a: "¢",
+  0x4b: ".",
+  0x4c: "<",
+  0x4d: "(",
+  0x4e: "+",
+  0x4f: "|",
+  0x50: "&",
+  0x5a: "!",
+  0x5b: "$",
+  0x5c: "*",
+  0x5d: ")",
+  0x5e: ";",
+  0x60: "-",
+  0x61: "/",
+  0x6b: ",",
+  0x6c: "%",
+  0x6d: "_",
+  0x6e: ">",
+  0x6f: "?",
+  0x79: "`",
+  0x7a: ":",
+  0x7b: "#",
+  0x7c: "@",
+  0x7d: "'",
+  0x7e: "=",
+  0x7f: '"',
+  0xa0: "µ",
+  0xa1: "~",
+  0xba: "[",
+  0xbb: "]",
+  0xc0: "{",
+  0xd0: "}",
+  0xe0: "\\",
+};
+
+function sanitizeMessage(message: string): string {
+  return message.replace(/\s+/g, "").trim();
+}
+
+function isAsciiDigitByte(byte: number): boolean {
+  return byte >= 0x30 && byte <= 0x39;
+}
+
+function isEbcdicDigitByte(byte: number): boolean {
+  return byte >= 0xf0 && byte <= 0xf9;
+}
+
+function decodeByteDigit(byte: number, encoding: TextEncoding): string | null {
+  if (encoding === "ascii" && isAsciiDigitByte(byte)) {
+    return String.fromCharCode(byte);
+  }
+
+  if (encoding === "ebcdic" && isEbcdicDigitByte(byte)) {
+    return String.fromCharCode(byte - 0xf0 + 0x30);
+  }
+
+  return null;
+}
+
+function decodeTextByte(byte: number, encoding: TextEncoding): string {
+  if (encoding === "ascii") {
+    return byte >= 0x20 && byte <= 0x7e
+      ? String.fromCharCode(byte)
+      : `\\x${byte.toString(16).padStart(2, "0").toUpperCase()}`;
+  }
+
+  const digit = decodeByteDigit(byte, "ebcdic");
+  if (digit) {
+    return digit;
+  }
+
+  if (byte >= 0xc1 && byte <= 0xc9) {
+    return String.fromCharCode(byte - 0xc1 + 65);
+  }
+  if (byte >= 0xd1 && byte <= 0xd9) {
+    return String.fromCharCode(byte - 0xd1 + 74);
+  }
+  if (byte >= 0xe2 && byte <= 0xe9) {
+    return String.fromCharCode(byte - 0xe2 + 83);
+  }
+  if (byte >= 0x81 && byte <= 0x89) {
+    return String.fromCharCode(byte - 0x81 + 97);
+  }
+  if (byte >= 0x91 && byte <= 0x99) {
+    return String.fromCharCode(byte - 0x91 + 106);
+  }
+  if (byte >= 0xa2 && byte <= 0xa9) {
+    return String.fromCharCode(byte - 0xa2 + 115);
+  }
+
+  return EBCDIC_SPECIAL_CHAR_MAP[byte] ?? `\\x${byte.toString(16).padStart(2, "0").toUpperCase()}`;
+}
+
+function decodeTextBytes(bytes: Uint8Array, encoding: TextEncoding): string {
+  return Array.from(bytes, (byte) => decodeTextByte(byte, encoding)).join("");
+}
+
+function decodeDigitBytes(bytes: Uint8Array, encoding: TextEncoding): string {
+  return Array.from(bytes, (byte) => decodeByteDigit(byte, encoding) ?? "").join("");
+}
+
+function parseHexMessage(message: string): Uint8Array {
+  const normalized = normalizeHex(message);
+  const bytes = new Uint8Array(normalized.length / 2);
+
+  for (let i = 0; i < normalized.length; i += 2) {
+    bytes[i / 2] = parseInt(normalized.substring(i, i + 2), 16);
+  }
+
+  return bytes;
+}
+
+function detectBinaryMessageEncoding(
+  bytes: Uint8Array
+): TextEncoding | undefined {
+  if (bytes.length < 4) {
+    return undefined;
+  }
+
+  if (Array.from(bytes.subarray(0, 4)).every(isAsciiDigitByte)) {
+    return "ascii";
+  }
+
+  if (Array.from(bytes.subarray(0, 4)).every(isEbcdicDigitByte)) {
+    return "ebcdic";
+  }
+
+  return undefined;
+}
+
+function normalizeMessageInput(message: string): NormalizedIsoMessage {
+  const sanitized = sanitizeMessage(message);
+
+  if (isValidHex(sanitized)) {
+    const bytes = parseHexMessage(sanitized);
+    const textEncoding = detectBinaryMessageEncoding(bytes);
+
+    if (textEncoding) {
+      return {
+        kind: "binary",
+        data: bytes,
+        textEncoding,
+      };
+    }
+  }
+
+  return {
+    kind: "text",
+    data: sanitized,
+  };
+}
+
+export function isSupportedIso8583Message(message: string): boolean {
+  const normalized = normalizeMessageInput(message);
+
+  if (normalized.kind === "text") {
+    return normalized.data.length >= 20 && /^\d{4}/.test(normalized.data);
+  }
+
+  return (
+    normalized.data.length >= 12 &&
+    /^\d{4}$/.test(
+      decodeTextBytes(normalized.data.subarray(0, 4), normalized.textEncoding)
+    )
+  );
+}
+
 /**
  * Parse an ISO 8583 message
  *
@@ -45,10 +241,16 @@ export function parseIso8583(
   message: string,
   options: Partial<Iso8583ParseOptions> = {}
 ): Iso8583ParseResult {
+  const normalizedMessage = normalizeMessageInput(message);
+
   // Merge default options with provided options
   const parseOptions: Iso8583ParseOptions = {
     ...DEFAULT_PARSE_OPTIONS,
     ...options,
+    binaryBitmap:
+      normalizedMessage.kind === "binary"
+        ? true
+        : options.binaryBitmap ?? DEFAULT_PARSE_OPTIONS.binaryBitmap,
   };
 
   // Initialize result
@@ -70,8 +272,7 @@ export function parseIso8583(
   };
 
   // Check if message is valid
-  if (!message || message.length < 20) {
-    // Minimum length: MTI(4) + Primary Bitmap(16)
+  if (!isSupportedIso8583Message(message)) {
     result.errors.push({
       message: "Message too short or invalid",
     });
@@ -83,7 +284,7 @@ export function parseIso8583(
 
     // Parse Message Type Indicator (MTI)
     const { mti, nextPosition } = parseMti(
-      message,
+      normalizedMessage,
       position,
       parseOptions.version
     );
@@ -92,7 +293,7 @@ export function parseIso8583(
 
     // Parse bitmap
     const { bitmap, nextPos, error } = parseBitmap(
-      message,
+      normalizedMessage,
       position,
       parseOptions.binaryBitmap,
       parseOptions.includeSecondaryBitmap,
@@ -108,45 +309,73 @@ export function parseIso8583(
     position = nextPos;
 
     // Parse data elements based on bitmap
-    for (const fieldId of bitmap.presentFields) {
-      try {
-        const fieldDefinition = getFieldDefinition(
-          fieldId,
-          parseOptions.version
-        );
+    if (normalizedMessage.kind === "binary") {
+      const parseState = parseBinaryFields(
+        normalizedMessage,
+        position,
+        bitmap.presentFields,
+        parseOptions.version,
+        parseOptions.validateFields ?? true
+      );
 
-        if (!fieldDefinition && parseOptions.validateFields) {
-          result.errors.push({
-            message: `Unknown field definition for field ${fieldId}`,
-            fieldId,
-          });
-          continue;
-        }
-
-        const { field, nextPos, error } = parseField(
-          message,
-          position,
-          fieldId,
-          fieldDefinition,
-          parseOptions.version
-        );
-
-        if (error) {
-          result.errors.push(error);
-          break;
-        }
-
-        result.fields[fieldId] = field;
-        position = nextPos;
-      } catch (e) {
+      if (!parseState) {
         result.errors.push({
-          message: `Error parsing field ${fieldId}: ${
-            e instanceof Error ? e.message : String(e)
-          }`,
-          fieldId,
+          message: "Unable to parse the binary ISO 8583 payload",
           position,
         });
-        break;
+        return result;
+      }
+
+      result.fields = parseState.fields;
+      position = parseState.position;
+
+      if (position < normalizedMessage.data.length) {
+        result.errors.push({
+          message: `Message contains ${normalizedMessage.data.length - position} trailing byte(s) after the parsed fields`,
+          position,
+        });
+      }
+    } else {
+      for (const fieldId of bitmap.presentFields) {
+        try {
+          const fieldDefinition = getFieldDefinition(
+            fieldId,
+            parseOptions.version
+          );
+
+          if (!fieldDefinition && parseOptions.validateFields) {
+            result.errors.push({
+              message: `Unknown field definition for field ${fieldId}`,
+              fieldId,
+            });
+            continue;
+          }
+
+          const { field, nextPos, error } = parseField(
+            normalizedMessage.data,
+            position,
+            fieldId,
+            fieldDefinition,
+            parseOptions.version
+          );
+
+          if (error) {
+            result.errors.push(error);
+            break;
+          }
+
+          result.fields[fieldId] = field;
+          position = nextPos;
+        } catch (e) {
+          result.errors.push({
+            message: `Error parsing field ${fieldId}: ${
+              e instanceof Error ? e.message : String(e)
+            }`,
+            fieldId,
+            position,
+          });
+          break;
+        }
       }
     }
   } catch (e) {
@@ -169,11 +398,14 @@ export function parseIso8583(
  * @returns Parsed MTI and next position
  */
 function parseMti(
-  message: string,
+  message: NormalizedIsoMessage,
   position: number,
   version: Iso8583Version
 ): { mti: MessageTypeIndicator; nextPosition: number } {
-  const mtiRaw = message.substring(position, position + 4);
+  const mtiRaw =
+    message.kind === "binary"
+      ? decodeTextBytes(message.data.subarray(position, position + 4), message.textEncoding)
+      : message.data.substring(position, position + 4);
 
   if (!/^\d{4}$/.test(mtiRaw)) {
     throw new Error("Invalid MTI format");
@@ -216,7 +448,7 @@ function parseMti(
  * @returns Parsed bitmap, next position, and any error
  */
 function parseBitmap(
-  message: string,
+  message: NormalizedIsoMessage,
   position: number,
   binaryBitmap: boolean,
   includeSecondary: boolean,
@@ -229,9 +461,13 @@ function parseBitmap(
 
   try {
     // Handle binary bitmap
-    const bitmapLength = binaryBitmap ? 8 : 16; // 8 bytes or 16 hex chars
+    const bitmapLength =
+      message.kind === "binary" || binaryBitmap ? 8 : 16; // 8 bytes or 16 hex chars
 
-    if (position + bitmapLength > message.length) {
+    const messageLength =
+      message.kind === "binary" ? message.data.length : message.data.length;
+
+    if (position + bitmapLength > messageLength) {
       return {
         bitmap,
         nextPos: position,
@@ -243,15 +479,16 @@ function parseBitmap(
     }
 
     // Extract primary bitmap
-    bitmap.primary = message.substring(position, position + bitmapLength);
+    bitmap.primary =
+      message.kind === "binary"
+        ? bytesToHex(Array.from(message.data.subarray(position, position + bitmapLength)))
+        : message.data.substring(position, position + bitmapLength);
     position += bitmapLength;
 
     // Convert binary bitmap to hex if needed
     let primaryBitmapHex = bitmap.primary;
-    if (binaryBitmap) {
-      primaryBitmapHex = Buffer.from(bitmap.primary, "binary")
-        .toString("hex")
-        .toUpperCase();
+    if (message.kind !== "binary" && binaryBitmap) {
+      primaryBitmapHex = Buffer.from(bitmap.primary, "binary").toString("hex").toUpperCase();
     }
 
     // Parse primary bitmap to get present fields
@@ -260,7 +497,7 @@ function parseBitmap(
 
     // Check if secondary bitmap is needed (field 1 is present)
     if (primaryFields.includes(1) && includeSecondary) {
-      if (position + bitmapLength > message.length) {
+      if (position + bitmapLength > messageLength) {
         return {
           bitmap,
           nextPos: position,
@@ -272,12 +509,15 @@ function parseBitmap(
       }
 
       // Extract secondary bitmap
-      bitmap.secondary = message.substring(position, position + bitmapLength);
+      bitmap.secondary =
+        message.kind === "binary"
+          ? bytesToHex(Array.from(message.data.subarray(position, position + bitmapLength)))
+          : message.data.substring(position, position + bitmapLength);
       position += bitmapLength;
 
       // Convert binary bitmap to hex if needed
       let secondaryBitmapHex = bitmap.secondary;
-      if (binaryBitmap) {
+      if (message.kind !== "binary" && binaryBitmap) {
         secondaryBitmapHex = Buffer.from(bitmap.secondary, "binary")
           .toString("hex")
           .toUpperCase();
@@ -289,7 +529,7 @@ function parseBitmap(
 
       // Check if tertiary bitmap is needed (field 65 is present)
       if (secondaryFields.includes(65) && includeTertiary) {
-        if (position + bitmapLength > message.length) {
+        if (position + bitmapLength > messageLength) {
           return {
             bitmap,
             nextPos: position,
@@ -301,12 +541,15 @@ function parseBitmap(
         }
 
         // Extract tertiary bitmap
-        bitmap.tertiary = message.substring(position, position + bitmapLength);
+        bitmap.tertiary =
+          message.kind === "binary"
+            ? bytesToHex(Array.from(message.data.subarray(position, position + bitmapLength)))
+            : message.data.substring(position, position + bitmapLength);
         position += bitmapLength;
 
         // Convert binary bitmap to hex if needed
         let tertiaryBitmapHex = bitmap.tertiary;
-        if (binaryBitmap) {
+        if (message.kind !== "binary" && binaryBitmap) {
           tertiaryBitmapHex = Buffer.from(bitmap.tertiary, "binary")
             .toString("hex")
             .toUpperCase();
@@ -368,6 +611,283 @@ function parseBitmapFields(bitmapHex: string, offset: number): number[] {
   }
 
   return presentFields;
+}
+
+function getLengthIndicatorDigits(fieldDefinition?: {
+  length: number;
+  lengthType: LengthType;
+}): number {
+  if (!fieldDefinition || fieldDefinition.lengthType !== LengthType.VARIABLE) {
+    return 0;
+  }
+
+  return fieldDefinition.length.toString().length;
+}
+
+function getMinimumFieldLength(fieldId: number, version: Iso8583Version): number {
+  const fieldDefinition = getFieldDefinition(fieldId, version);
+
+  if (!fieldDefinition) {
+    return 1;
+  }
+
+  if (fieldDefinition.lengthType === LengthType.VARIABLE) {
+    return getLengthIndicatorDigits(fieldDefinition) + (fieldDefinition.minLength ?? 1);
+  }
+
+  return fieldDefinition.length;
+}
+
+function getRemainingMinimumLength(
+  fieldIds: number[],
+  version: Iso8583Version
+): number {
+  return fieldIds.reduce(
+    (total, fieldId) => total + getMinimumFieldLength(fieldId, version),
+    0
+  );
+}
+
+function decodeBinaryFieldValue(
+  valueBytes: Uint8Array,
+  fieldDefinition: ReturnType<typeof getFieldDefinition>,
+  textEncoding: TextEncoding
+): string {
+  if (fieldDefinition?.format === FieldFormat.BINARY) {
+    return bytesToHex(Array.from(valueBytes));
+  }
+
+  return decodeTextBytes(valueBytes, textEncoding);
+}
+
+function isFieldValueValid(field: IsoField, validateFields: boolean): boolean {
+  if (!validateFields || !field.definition) {
+    return true;
+  }
+
+  if (field.definition.format === FieldFormat.BINARY) {
+    return /^[0-9A-F]*$/.test(field.value) && field.value.length % 2 === 0;
+  }
+
+  if (field.definition.format === FieldFormat.NUMERIC) {
+    return /^\d+$/.test(field.value);
+  }
+
+  if (field.definition.lengthType === LengthType.FIXED) {
+    const valueLength = field.value.length;
+    const minLength = field.definition.length;
+    const maxLength = field.definition.maxLength ?? field.definition.length;
+
+    return valueLength >= minLength && valueLength <= maxLength;
+  }
+
+  return true;
+}
+
+function buildBinaryFieldCandidates(
+  message: Extract<NormalizedIsoMessage, { kind: "binary" }>,
+  position: number,
+  fieldId: number,
+  version: Iso8583Version,
+  remainingFieldIds: number[],
+  validateFields: boolean
+): BinaryFieldCandidate[] {
+  const fieldDefinition = getFieldDefinition(fieldId, version);
+  const availableBytes = message.data.length - position;
+  const remainingMinimumBytes = getRemainingMinimumLength(remainingFieldIds, version);
+  const maxValueBytes = Math.max(availableBytes - remainingMinimumBytes, 0);
+  const candidates: BinaryFieldCandidate[] = [];
+
+  if (!fieldDefinition) {
+    if (availableBytes > remainingMinimumBytes) {
+      const valueBytes = message.data.subarray(position, position + 1);
+      candidates.push({
+        field: {
+          id: fieldId,
+          value: decodeTextBytes(valueBytes, message.textEncoding),
+          raw: bytesToHex(Array.from(valueBytes)),
+        },
+        nextPos: position + 1,
+        score: -1,
+      });
+    }
+
+    return candidates;
+  }
+
+  const buildCandidate = (
+    valueStart: number,
+    valueLength: number,
+    lengthIndicatorBytes?: Uint8Array
+  ): BinaryFieldCandidate | undefined => {
+    if (valueLength <= 0 || valueStart + valueLength > message.data.length) {
+      return undefined;
+    }
+
+    const valueBytes = message.data.subarray(valueStart, valueStart + valueLength);
+    const field: IsoField = {
+      id: fieldId,
+      value: decodeBinaryFieldValue(valueBytes, fieldDefinition, message.textEncoding),
+      raw: bytesToHex([
+        ...(lengthIndicatorBytes ? Array.from(lengthIndicatorBytes) : []),
+        ...Array.from(valueBytes),
+      ]),
+      definition: fieldDefinition,
+    };
+
+    if (lengthIndicatorBytes) {
+      field.lengthIndicator = decodeDigitBytes(
+        lengthIndicatorBytes,
+        message.textEncoding
+      );
+    }
+
+    if (!isFieldValueValid(field, validateFields)) {
+      return undefined;
+    }
+
+    return {
+      field,
+      nextPos: valueStart + valueLength,
+      score: lengthIndicatorBytes ? 2 : 0,
+    };
+  };
+
+  if (fieldDefinition.lengthType === LengthType.VARIABLE) {
+    const lengthIndicatorDigits = getLengthIndicatorDigits(fieldDefinition);
+    const lengthIndicatorBytes = message.data.subarray(
+      position,
+      position + lengthIndicatorDigits
+    );
+    const parsedLengthIndicator = decodeDigitBytes(
+      lengthIndicatorBytes,
+      message.textEncoding
+    );
+    const hasValidLengthIndicator =
+      parsedLengthIndicator.length === lengthIndicatorDigits &&
+      /^\d+$/.test(parsedLengthIndicator);
+
+    if (hasValidLengthIndicator) {
+      const fieldLength = parseInt(parsedLengthIndicator, 10);
+      const maxLength = fieldDefinition.maxLength ?? fieldDefinition.length;
+
+      if (fieldLength <= maxLength && fieldLength <= maxValueBytes) {
+        const candidate = buildCandidate(
+          position + lengthIndicatorDigits,
+          fieldLength,
+          lengthIndicatorBytes
+        );
+
+        if (candidate) {
+          candidates.push(candidate);
+        }
+      }
+    }
+
+    if (candidates.length === 0) {
+      const minLength = fieldDefinition.minLength ?? 1;
+      const maxLength = Math.min(
+        fieldDefinition.maxLength ?? fieldDefinition.length,
+        maxValueBytes
+      );
+
+      for (let fieldLength = maxLength; fieldLength >= minLength; fieldLength--) {
+        const candidate = buildCandidate(position, fieldLength);
+        if (candidate) {
+          candidate.score = -2;
+          candidates.push(candidate);
+        }
+      }
+    }
+
+    return candidates;
+  }
+
+  const minLength = fieldDefinition.length;
+  const maxLength = Math.min(
+    fieldDefinition.maxLength ?? fieldDefinition.length,
+    maxValueBytes
+  );
+
+  for (let fieldLength = minLength; fieldLength <= maxLength; fieldLength++) {
+    const candidate = buildCandidate(position, fieldLength);
+    if (candidate) {
+      candidates.push(candidate);
+    }
+  }
+
+  return candidates;
+}
+
+function parseBinaryFields(
+  message: Extract<NormalizedIsoMessage, { kind: "binary" }>,
+  position: number,
+  fieldIds: number[],
+  version: Iso8583Version,
+  validateFields: boolean
+): FieldParseState | null {
+  const cache = new Map<string, FieldParseState | null>();
+
+  const walk = (fieldIndex: number, currentPosition: number): FieldParseState | null => {
+    const cacheKey = `${fieldIndex}:${currentPosition}`;
+    if (cache.has(cacheKey)) {
+      return cache.get(cacheKey) ?? null;
+    }
+
+    if (fieldIndex >= fieldIds.length) {
+      const state = {
+        fields: {},
+        position: currentPosition,
+        score: 0,
+      };
+      cache.set(cacheKey, state);
+      return state;
+    }
+
+    const fieldId = fieldIds[fieldIndex];
+    const remainingFieldIds = fieldIds.slice(fieldIndex + 1);
+    const candidates = buildBinaryFieldCandidates(
+      message,
+      currentPosition,
+      fieldId,
+      version,
+      remainingFieldIds,
+      validateFields
+    );
+
+    let bestState: FieldParseState | null = null;
+
+    for (const candidate of candidates) {
+      const nextState = walk(fieldIndex + 1, candidate.nextPos);
+
+      if (!nextState) {
+        continue;
+      }
+
+      const mergedState: FieldParseState = {
+        fields: {
+          [fieldId]: candidate.field,
+          ...nextState.fields,
+        },
+        position: nextState.position,
+        score: candidate.score + nextState.score,
+      };
+
+      if (
+        !bestState ||
+        mergedState.position > bestState.position ||
+        (mergedState.position === bestState.position &&
+          mergedState.score > bestState.score)
+      ) {
+        bestState = mergedState;
+      }
+    }
+
+    cache.set(cacheKey, bestState);
+    return bestState;
+  };
+
+  return walk(0, position);
 }
 
 /**
