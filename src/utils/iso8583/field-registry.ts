@@ -224,7 +224,8 @@ function registerISO8583_1987Fields(): void {
       length: 40,
       lengthType: LengthType.FIXED,
       maxLength: 99,
-      description: "Name and location of the card acceptor",
+      description:
+        "Name and location of the card acceptor; some private network variants extend this nominal 40-character field with additional location details",
     },
     {
       id: 49,

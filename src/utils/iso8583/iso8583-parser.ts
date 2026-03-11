@@ -52,6 +52,9 @@ type NormalizedIsoMessage =
 type FieldParseState = {
   fields: Record<number, IsoField>;
   position: number;
+  // Higher scores represent more trustworthy parses:
+  // +2 = valid variable-length indicator, 0 = standard fixed-length match,
+  // -1 = unknown-field fallback, -2 = variable field parsed without an indicator.
   score: number;
 };
 
@@ -61,6 +64,8 @@ type BinaryFieldCandidate = {
   score: number;
 };
 
+// Minimal CP037-compatible mappings for printable special characters that appear
+// in card network payloads. Letters and digits are handled algorithmically below.
 const EBCDIC_SPECIAL_CHAR_MAP: Record<number, string> = {
   0x40: " ",
   0x4a: "¢",
@@ -213,6 +218,16 @@ function normalizeMessageInput(message: string): NormalizedIsoMessage {
     kind: "text",
     data: sanitized,
   };
+}
+
+function binaryToHex(binaryText: string): string {
+  const bytes: number[] = [];
+
+  for (let i = 0; i < binaryText.length; i++) {
+    bytes.push(binaryText.charCodeAt(i) & 0xff);
+  }
+
+  return bytesToHex(bytes);
 }
 
 export function isSupportedIso8583Message(message: string): boolean {
@@ -464,8 +479,7 @@ function parseBitmap(
     const bitmapLength =
       message.kind === "binary" || binaryBitmap ? 8 : 16; // 8 bytes or 16 hex chars
 
-    const messageLength =
-      message.kind === "binary" ? message.data.length : message.data.length;
+    const messageLength = message.data.length;
 
     if (position + bitmapLength > messageLength) {
       return {
@@ -488,7 +502,7 @@ function parseBitmap(
     // Convert binary bitmap to hex if needed
     let primaryBitmapHex = bitmap.primary;
     if (message.kind !== "binary" && binaryBitmap) {
-      primaryBitmapHex = Buffer.from(bitmap.primary, "binary").toString("hex").toUpperCase();
+      primaryBitmapHex = binaryToHex(bitmap.primary);
     }
 
     // Parse primary bitmap to get present fields
@@ -518,9 +532,7 @@ function parseBitmap(
       // Convert binary bitmap to hex if needed
       let secondaryBitmapHex = bitmap.secondary;
       if (message.kind !== "binary" && binaryBitmap) {
-        secondaryBitmapHex = Buffer.from(bitmap.secondary, "binary")
-          .toString("hex")
-          .toUpperCase();
+        secondaryBitmapHex = binaryToHex(bitmap.secondary);
       }
 
       // Parse secondary bitmap to get present fields (fields 65-128)
@@ -550,9 +562,7 @@ function parseBitmap(
         // Convert binary bitmap to hex if needed
         let tertiaryBitmapHex = bitmap.tertiary;
         if (message.kind !== "binary" && binaryBitmap) {
-          tertiaryBitmapHex = Buffer.from(bitmap.tertiary, "binary")
-            .toString("hex")
-            .toUpperCase();
+          tertiaryBitmapHex = binaryToHex(bitmap.tertiary);
         }
 
         // Parse tertiary bitmap to get present fields (fields 129-192)
@@ -790,6 +800,16 @@ function buildBinaryFieldCandidates(
         fieldDefinition.maxLength ?? fieldDefinition.length,
         maxValueBytes
       );
+
+      if (remainingFieldIds.length === 0) {
+        const candidate = buildCandidate(position, maxLength);
+        if (candidate) {
+          candidate.score = -2;
+          candidates.push(candidate);
+        }
+
+        return candidates;
+      }
 
       for (let fieldLength = maxLength; fieldLength >= minLength; fieldLength--) {
         const candidate = buildCandidate(position, fieldLength);
