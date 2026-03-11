@@ -158,7 +158,11 @@ export function IsoViewer(): JSX.Element {
             </TabsList>
 
             <TabsContent value="input" className="mt-0">
-              <IsoInput onParse={handleParse} initialValue={inputMessage} />
+              <IsoInput
+                onParse={handleParse}
+                initialValue={inputMessage}
+                onLoadExample={handleLoadExample}
+              />
             </TabsContent>
 
             <TabsContent value="results" className="mt-0">

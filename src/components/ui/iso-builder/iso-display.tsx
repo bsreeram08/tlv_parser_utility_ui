@@ -4,7 +4,7 @@
  * A component for displaying parsed ISO 8583 message data in a structured, readable format.
  */
 
-import { type JSX } from "react";
+import { useEffect, useMemo, useState, type JSX } from "react";
 import { type Iso8583ParseResult, type IsoField } from "@/types/iso8583";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   getMtiClassDescription,
   getMtiFunctionDescription,
@@ -29,6 +31,41 @@ interface IsoDisplayProps {
 }
 
 export function IsoDisplay({ result }: IsoDisplayProps): JSX.Element {
+  const [fieldSearch, setFieldSearch] = useState("");
+  const [expandedFields, setExpandedFields] = useState<string[]>([]);
+
+  const sortedFields = useMemo(
+    () =>
+      result ? Object.values(result.fields).sort((a, b) => a.id - b.id) : [],
+    [result]
+  );
+
+  const filteredFields = useMemo(() => {
+    const normalizedSearch = fieldSearch.trim().toLowerCase();
+
+    if (!normalizedSearch) {
+      return sortedFields;
+    }
+
+    return sortedFields.filter((field) => {
+      const searchableParts = [
+        String(field.id),
+        field.definition?.name ?? "",
+        field.definition?.description ?? "",
+        field.value,
+      ];
+
+      return searchableParts.some((value) =>
+        value.toLowerCase().includes(normalizedSearch)
+      );
+    });
+  }, [fieldSearch, sortedFields]);
+
+  useEffect(() => {
+    setFieldSearch("");
+    setExpandedFields([]);
+  }, [result]);
+
   if (!result) {
     return (
       <div className="text-center p-8 text-muted-foreground">
@@ -152,18 +189,85 @@ export function IsoDisplay({ result }: IsoDisplayProps): JSX.Element {
       {/* Display parsed fields */}
       <Card>
         <CardHeader className="py-4">
-          <CardTitle>Data Elements</CardTitle>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <CardTitle>Data Elements</CardTitle>
+            {fieldCount > 0 && (
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={fieldSearch}
+                    onChange={(event) => setFieldSearch(event.target.value)}
+                    placeholder="Search by field, name, or value..."
+                    className="w-full sm:w-72"
+                  />
+                  {fieldSearch && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setFieldSearch("")}
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setExpandedFields(
+                        filteredFields.map((field) => `field-${field.id}`)
+                      )
+                    }
+                    disabled={filteredFields.length === 0}
+                  >
+                    Expand all
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setExpandedFields([])}
+                    disabled={expandedFields.length === 0}
+                  >
+                    Collapse all
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="pb-4">
           <ScrollArea className="h-[calc(100vh-550px)]">
             {fieldCount > 0 ? (
-              <Accordion type="multiple" className="w-full">
-                {Object.values(result.fields)
-                  .sort((a, b) => a.id - b.id)
-                  .map((field) => (
-                    <FieldAccordionItem key={field.id} field={field} />
-                  ))}
-              </Accordion>
+              <>
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary">
+                    Showing {filteredFields.length} of {fieldCount} fields
+                  </Badge>
+                  {fieldSearch && filteredFields.length > 0 && (
+                    <Badge variant="outline">Filtered by “{fieldSearch}”</Badge>
+                  )}
+                </div>
+                {filteredFields.length > 0 ? (
+                  <Accordion
+                    type="multiple"
+                    className="w-full"
+                    value={expandedFields}
+                    onValueChange={setExpandedFields}
+                  >
+                    {filteredFields.map((field) => (
+                      <FieldAccordionItem key={field.id} field={field} />
+                    ))}
+                  </Accordion>
+                ) : (
+                  <div className="text-center p-4 text-muted-foreground">
+                    No data elements match the current search
+                  </div>
+                )}
+              </>
             ) : (
               <div className="text-center p-4 text-muted-foreground">
                 No data elements were parsed
@@ -195,7 +299,12 @@ function FieldAccordionItem({ field }: FieldAccordionItemProps): JSX.Element {
         <div className="space-y-2 pl-2">
           {/* Field value */}
           <div>
-            <h4 className="text-sm font-medium">Value</h4>
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="text-sm font-medium">Value</h4>
+              <span className="text-xs text-muted-foreground">
+                {field.value.length} characters
+              </span>
+            </div>
             <div className="bg-muted p-2 rounded font-mono text-xs break-all mt-1">
               {field.value}
             </div>

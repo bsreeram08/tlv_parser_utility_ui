@@ -4,10 +4,10 @@
  * A component for entering and validating ISO 8583 message data.
  */
 
-import { useState, type JSX } from "react";
+import { useEffect, useState, type JSX } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Eraser, FlaskConical } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Select,
@@ -31,6 +31,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 
 // Form schema for ISO 8583 input
 const formSchema = z.object({
@@ -52,11 +53,13 @@ interface IsoInputProps {
     }
   ) => void;
   initialValue?: string;
+  onLoadExample?: () => void;
 }
 
 export function IsoInput({
   onParse,
   initialValue = "",
+  onLoadExample,
 }: IsoInputProps): JSX.Element {
   const [error, setError] = useState<string | null>(null);
 
@@ -70,6 +73,17 @@ export function IsoInput({
       validateFields: true,
     },
   });
+
+  const messageValue = form.watch("message");
+  const trimmedMessage = messageValue.trim();
+
+  useEffect(() => {
+    form.setValue("message", initialValue, {
+      shouldDirty: false,
+      shouldTouch: false,
+      shouldValidate: false,
+    });
+  }, [form, initialValue]);
 
   /**
    * Validate ISO 8583 message
@@ -99,28 +113,71 @@ export function IsoInput({
     }
   };
 
+  const handleClear = () => {
+    form.setValue("message", "", {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+    setError(null);
+  };
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 w-full">
         <FormField
           control={form.control}
           name="message"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>ISO 8583 Message</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="Enter a text ISO 8583 message or a hex-encoded binary/EBCDIC payload"
-                  className="font-mono h-36 resize-y"
-                  {...field}
-                />
-              </FormControl>
-              <FormDescription>
-                Supports plain-text ISO 8583 messages and hex-encoded payloads with ASCII or EBCDIC MTIs
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
+            render={({ field }) => (
+              <FormItem>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-2">
+                    <FormLabel>ISO 8583 Message</FormLabel>
+                    {trimmedMessage && (
+                      <Badge variant="outline">
+                        {trimmedMessage.length} characters
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {onLoadExample && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={onLoadExample}
+                      >
+                        <FlaskConical className="mr-2 h-4 w-4" />
+                        Load example
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleClear}
+                      disabled={!trimmedMessage}
+                    >
+                      <Eraser className="mr-2 h-4 w-4" />
+                      Clear
+                    </Button>
+                  </div>
+                </div>
+                <FormControl>
+                  <Textarea
+                    id="iso8583-message"
+                    placeholder="Enter a text ISO 8583 message or a hex-encoded binary/EBCDIC payload"
+                    className="font-mono h-36 resize-y"
+                    {...field}
+                  />
+                </FormControl>
+                <FormDescription>
+                  Supports plain-text ISO 8583 messages and hex-encoded payloads with ASCII or EBCDIC MTIs.
+                  Paste a message, or load the sample to inspect a parsed result quickly.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
