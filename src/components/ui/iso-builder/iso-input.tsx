@@ -74,16 +74,17 @@ export function IsoInput({
     },
   });
 
+  const { setValue } = form;
   const messageValue = form.watch("message");
   const trimmedMessage = messageValue.trim();
 
   useEffect(() => {
-    form.setValue("message", initialValue, {
+    setValue("message", initialValue, {
       shouldDirty: false,
       shouldTouch: false,
       shouldValidate: false,
     });
-  }, [form, initialValue]);
+  }, [initialValue, setValue]);
 
   /**
    * Validate ISO 8583 message
@@ -114,7 +115,7 @@ export function IsoInput({
   };
 
   const handleClear = () => {
-    form.setValue("message", "", {
+    setValue("message", "", {
       shouldDirty: true,
       shouldTouch: true,
       shouldValidate: true,
