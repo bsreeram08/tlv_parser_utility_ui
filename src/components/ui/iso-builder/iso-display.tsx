@@ -194,11 +194,14 @@ export function IsoDisplay({ result }: IsoDisplayProps): JSX.Element {
             {fieldCount > 0 && (
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <div className="flex items-center gap-2">
+                  <label htmlFor="iso8583-field-search" className="sr-only">
+                    Search data elements
+                  </label>
                   <Input
+                    id="iso8583-field-search"
                     value={fieldSearch}
                     onChange={(event) => setFieldSearch(event.target.value)}
                     placeholder="Search by field, name, or value..."
-                    aria-label="Search data elements"
                     className="w-full sm:w-72"
                   />
                   {fieldSearch && (
@@ -266,7 +269,10 @@ export function IsoDisplay({ result }: IsoDisplayProps): JSX.Element {
                     ))}
                   </Accordion>
                 ) : (
-                  <div className="text-center p-4 text-muted-foreground">
+                  <div
+                    className="text-center p-4 text-muted-foreground"
+                    aria-live="polite"
+                  >
                     No data elements match the current search
                   </div>
                 )}

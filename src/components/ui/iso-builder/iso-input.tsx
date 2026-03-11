@@ -137,10 +137,7 @@ export function IsoInput({
                       ISO 8583 Message
                     </FormLabel>
                     {trimmedMessage && (
-                      <Badge
-                        variant="outline"
-                        aria-label={`Message length: ${trimmedMessage.length} characters`}
-                      >
+                      <Badge variant="outline">
                         {trimmedMessage.length} characters
                       </Badge>
                     )}
@@ -179,7 +176,7 @@ export function IsoInput({
                 </FormControl>
                 <FormDescription>
                   Supports plain-text ISO 8583 messages and hex-encoded payloads with ASCII or EBCDIC MTIs.
-                  Paste a message, or load the sample to inspect a parsed result quickly.
+                  Paste a message, or load an example to inspect a parsed result quickly.
                 </FormDescription>
                 <FormMessage />
               </FormItem>
