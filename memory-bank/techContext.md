@@ -2,57 +2,45 @@
 
 ## Technology Stack
 
-### Frontend
-- **Framework:** React 19 with TypeScript
-- **UI Components:** Shadcn/UI (based on Radix UI primitives)
-- **State Management:** 
-  - Context API for global application state
-  - Jotai for atomic state management of complex forms
-- **Styling:** Tailwind CSS with custom utilities
-- **Runtime:** Bun
-- **Build Tool:** Vite
-- **Form Handling:** React Hook Form with Zod validation
+### Application host
 
-### Key Dependencies
-- **Cryptography:** crypto-js for standard cryptographic operations
-- **Data Manipulation:** buffer for binary data handling
-- **Numerical Precision:** jsbi for precise integer arithmetic
-- **UI Components:**
-  - Radix UI primitives for accessible components
-  - Tailwind CSS for styling
-  - Lucide React for icons
-  - React Day Picker for date inputs
-  - Recharts for data visualization
-  - Sonner for toast notifications
+- **Framework:** Astro 7, statically generated.
+- **Design system:** Bearnie-owned Astro components and semantic CSS tokens.
+- **Styling:** Tailwind CSS 4 through the official Vite plugin used by Astro.
+- **Package manager/runtime:** Bun.
 
-## Development Setup
-- TypeScript for type safety
-- ESLint for code quality
-- Vite for fast development server and building
-- Path aliases for clean imports
+### Interactive workspace
 
-## Technical Constraints
-- All cryptographic operations must use well-established, reviewed libraries
-- Browser security limitations for certain cryptographic operations
-- Memory limitations when handling large message sets
-- Cross-browser compatibility requirements
-- Accessibility compliance for all UI components
+- **Client island:** React 19 through `@astrojs/react`.
+- **Accessible interaction adapters:** Radix primitives internal to the React workspace.
+- **Forms:** React Hook Form and Zod.
+- **Local state:** React state/context and Jotai where appropriate.
+- **Persistence:** Dexie over IndexedDB.
 
-## Dependencies
-- Node.js/Bun environment
-- Modern browser with ES6+ support
-- Secure context for certain cryptographic operations
+### Payment-domain dependencies
 
-## Tool Usage Patterns
+- `crypto-js` for established cryptographic operations.
+- `buffer` for binary data handling.
+- `jsbi` for precise integer arithmetic.
 
-### Development Workflow
-1. Local development with Vite dev server
-2. TypeScript compilation with strict type checking
-3. ESLint for code quality enforcement
-4. Component-driven development with isolated testing
+## Development Workflow
 
-### Deployment Considerations
-- Static site deployment possible (no server-side requirements)
-- Environment variables for API configurations
-- Potential for PWA functionality
-- Version management for backward compatibility
+```sh
+bun install
+bun run dev
+bun run check
+bun run lint
+bun test
+bun run build
+```
+
+Astro serves development on port `4321` by default. The production build is static and requires no server adapter.
+
+## Constraints
+
+- Payment computations remain framework-independent TypeScript.
+- The client-only workspace owns all browser state that must coordinate across panes.
+- Astro/Bearnie own static routes, the document, metadata, and future progressively enhanced surfaces.
+- Bun is the only package manager; do not add an npm lockfile.
+- The build must reject malicious `keyv@6.0.0` per GHSA-3p9h-f68w-m6fx.
+- Accessibility, keyboard operation, reduced motion, and cross-browser behavior remain release requirements.

@@ -7,6 +7,11 @@
 
 import { type EmvTag, TagClass, TagFormat } from "@/types/tlv";
 import { allPredefinedCustomTags } from "./predefined-custom-tags";
+import {
+  ADDITIONAL_STANDARD_TAGS,
+  KERNEL2_TAGS,
+  UNDOCUMENTED_TAGS,
+} from "@/utils/emv/kernel2-tags";
 
 /**
  * Map of tag IDs to their definitions
@@ -197,6 +202,120 @@ function registerStandardTags(): void {
       minLength: 2,
       maxLength: 8,
     },
+    {
+      id: "9B",
+      name: "Transaction Status Information",
+      description:
+        "Indicates the functions performed in a transaction, as seen by the terminal",
+      format: TagFormat.PRIMITIVE,
+      class: TagClass.CONTEXT_SPECIFIC,
+      fixedLength: 2,
+    },
+    {
+      id: "8C",
+      name: "Card Risk Management Data Object List 1 (CDOL1)",
+      description:
+        "List of tags and lengths the terminal must supply in the first GENERATE AC command",
+      format: TagFormat.PRIMITIVE,
+      class: TagClass.CONTEXT_SPECIFIC,
+      minLength: 0,
+      maxLength: 252,
+    },
+    {
+      id: "8D",
+      name: "Card Risk Management Data Object List 2 (CDOL2)",
+      description:
+        "List of tags and lengths the terminal must supply in the second GENERATE AC command",
+      format: TagFormat.PRIMITIVE,
+      class: TagClass.CONTEXT_SPECIFIC,
+      minLength: 0,
+      maxLength: 252,
+    },
+    {
+      id: "97",
+      name: "Transaction Certificate Data Object List (TDOL)",
+      description:
+        "List of tags and lengths used to build the Transaction Certificate hash value",
+      format: TagFormat.PRIMITIVE,
+      class: TagClass.CONTEXT_SPECIFIC,
+      minLength: 0,
+      maxLength: 252,
+    },
+    {
+      id: "9F38",
+      name: "Processing Options Data Object List (PDOL)",
+      description:
+        "List of tags and lengths the terminal must supply in the GET PROCESSING OPTIONS command",
+      format: TagFormat.PRIMITIVE,
+      class: TagClass.CONTEXT_SPECIFIC,
+      minLength: 0,
+      maxLength: 252,
+    },
+    {
+      id: "9F4F",
+      name: "Log Format",
+      description:
+        "List of tags and lengths describing the format of each transaction log record",
+      format: TagFormat.PRIMITIVE,
+      class: TagClass.CONTEXT_SPECIFIC,
+      minLength: 0,
+      maxLength: 252,
+    },
+    {
+      id: "9F07",
+      name: "Application Usage Control",
+      description:
+        "Issuer-specified restrictions on the geographic and service usage of the application",
+      format: TagFormat.PRIMITIVE,
+      class: TagClass.CONTEXT_SPECIFIC,
+      fixedLength: 2,
+    },
+    {
+      id: "9F40",
+      name: "Additional Terminal Capabilities",
+      description:
+        "Indicates the data input, output and transaction-type capabilities of the terminal",
+      format: TagFormat.PRIMITIVE,
+      class: TagClass.CONTEXT_SPECIFIC,
+      fixedLength: 5,
+    },
+    {
+      id: "9F66",
+      name: "Terminal Transaction Qualifiers (TTQ)",
+      description:
+        "Visa contactless reader capabilities and transaction requirements",
+      format: TagFormat.PRIMITIVE,
+      class: TagClass.CONTEXT_SPECIFIC,
+      fixedLength: 4,
+    },
+    {
+      id: "9F6B",
+      name: "Track 2 Data",
+      description:
+        "Track 2 data read from a contactless card, in ISO/IEC 7813 layout",
+      format: TagFormat.PRIMITIVE,
+      class: TagClass.CONTEXT_SPECIFIC,
+      minLength: 0,
+      maxLength: 19,
+    },
+    {
+      id: "9F6C",
+      name: "Card Transaction Qualifiers (CTQ)",
+      description:
+        "Card-supplied CVM and interface instructions for a Visa contactless transaction",
+      format: TagFormat.PRIMITIVE,
+      class: TagClass.CONTEXT_SPECIFIC,
+      fixedLength: 2,
+    },
+    {
+      id: "9F53",
+      name: "Transaction Category Code",
+      description:
+        "Single character indicating the category of the transaction (Mastercard)",
+      format: TagFormat.PRIMITIVE,
+      class: TagClass.CONTEXT_SPECIFIC,
+      fixedLength: 1,
+    },
   ];
 
   // Register all tags in the registry
@@ -208,23 +327,42 @@ function registerStandardTags(): void {
 // Initialize the registry with standard tags
 registerStandardTags();
 
+// Standard tags a generic list often misses, then the Mastercard Kernel 2
+// proprietary DF81xx range (Book C-2 Annex A). Registered before the predefined
+// custom tags so the spec names win over any local guess.
+ADDITIONAL_STANDARD_TAGS.forEach((tag) => {
+  registerTag(tag);
+});
+KERNEL2_TAGS.forEach((tag) => {
+  registerTag(tag);
+});
+
+// Tags that appear in real configs but no book defines. Named honestly rather
+// than guessed at.
+UNDOCUMENTED_TAGS.forEach((tag) => {
+  registerTag(tag);
+});
+
 // Load predefined custom tags
 allPredefinedCustomTags.forEach((tag) => {
   registerTag(tag);
 });
 
-// This event will be triggered when the database has loaded custom tags
-document.addEventListener("CustomTagsLoaded", (event: Event) => {
-  // If we receive custom tags from the database, register them
-  const customEvent = event as CustomEvent<EmvTag[]>;
-  const customTags = customEvent.detail;
+// Browser storage is an adapter at the workspace seam. Keeping the registry
+// importable without a DOM lets Astro diagnostics and Bun tests exercise the
+// payment-domain module directly.
+if (typeof document !== "undefined") {
+  document.addEventListener("CustomTagsLoaded", (event: Event) => {
+    const customEvent = event as CustomEvent<EmvTag[]>;
+    const customTags = customEvent.detail;
 
-  if (customTags && Array.isArray(customTags)) {
-    customTags.forEach((tag) => {
-      registerTag(tag);
-    });
-  }
-});
+    if (customTags && Array.isArray(customTags)) {
+      customTags.forEach((tag) => {
+        registerTag(tag);
+      });
+    }
+  });
+}
 
 /**
  * Get information about a specific tag

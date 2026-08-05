@@ -2,6 +2,7 @@ import Dexie from "dexie";
 import type { Table } from "dexie";
 import type { CustomTagDefinition } from "@/types/custom-tag";
 import type { SavedTlvComparison } from "@/types/tlv-comparison";
+import type { StoredBitfieldSpec } from "@/utils/tlv/custom-bitfields";
 
 // Define the saved data structure for TLV tests
 export interface SavedTlvTest {
@@ -41,6 +42,7 @@ export class PaymentUtilsDB extends Dexie {
   isoTests!: Table<SavedIsoTest>;
   customTags!: Table<CustomTagDefinition>;
   tlvComparisons!: Table<SavedTlvComparison>;
+  customBitfields!: Table<StoredBitfieldSpec>;
 
   constructor() {
     super("paymentUtilsDB");
@@ -63,6 +65,11 @@ export class PaymentUtilsDB extends Dexie {
     // Add TLV comparisons table in version 4
     this.version(4).stores({
       tlvComparisons: "++id, date, name, *tags, category, favorite, lastAccessed, source"
+    });
+
+    // Add user-built bitfield tag decoders in version 5, keyed by tag
+    this.version(5).stores({
+      customBitfields: "tag, name, modified"
     });
   }
 
@@ -148,6 +155,30 @@ export class PaymentUtilsDB extends Dexie {
       .toArray();
   }
   
+  // Custom bitfield decoder methods
+
+  // Insert or replace a user-built bitfield decoder
+  async saveCustomBitfield(spec: StoredBitfieldSpec): Promise<string> {
+    const existing = await this.customBitfields.get(spec.tag);
+    return await this.customBitfields.put({
+      ...spec,
+      created: existing?.created ?? new Date(),
+      modified: new Date(),
+    });
+  }
+
+  async getAllCustomBitfields(): Promise<StoredBitfieldSpec[]> {
+    return await this.customBitfields.toArray();
+  }
+
+  async getCustomBitfield(tag: string): Promise<StoredBitfieldSpec | undefined> {
+    return await this.customBitfields.get(tag.toUpperCase());
+  }
+
+  async deleteCustomBitfield(tag: string): Promise<void> {
+    return await this.customBitfields.delete(tag.toUpperCase());
+  }
+
   // TLV Comparison methods
   
   // Save a TLV comparison

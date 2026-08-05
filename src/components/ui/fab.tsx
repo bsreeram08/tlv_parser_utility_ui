@@ -5,7 +5,6 @@ import {
   FileText,
   Code,
   Share2,
-  Settings,
   XCircle,
   Save,
 } from "lucide-react";
@@ -68,28 +67,25 @@ export function FloatingActionButton({
   const handleCopyResults = () => {
     if (onCopyResults) {
       onCopyResults();
-      toast.success("Results copied to clipboard");
     }
   };
 
   const handleExportJson = () => {
     if (onExportJson) {
       onExportJson();
-      toast.success("Results exported as JSON");
     }
   };
 
   const handleShowExample = () => {
     if (onShowExample) {
       onShowExample();
-      toast.info("Example loaded");
     }
   };
 
   return (
     <>
-      {/* Main Floating Action Button with Notification Badge */}
-      <div className="fixed right-6 bottom-6 z-50">
+      {/* Instance-scoped actions stay inside the tool panel on a canvas. */}
+      <div className="flex justify-end pt-2">
         <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
           <TooltipProvider>
             <Tooltip>
@@ -97,11 +93,13 @@ export function FloatingActionButton({
                 <div className="relative">
                   <DropdownMenuTrigger asChild>
                     <Button
-                      size="lg"
-                      className="h-14 w-14 rounded-full shadow-lg"
+                      size="icon"
+                      className="size-9 rounded-full shadow-md"
+                      aria-label="Open tool actions"
+                      title="Tool actions"
                     >
                       <Plus
-                        className={`h-6 w-6 transition-transform duration-200 ${
+                        className={`h-4 w-4 transition-transform duration-[140ms] ease-[var(--ease-out)] ${
                           isOpen ? "rotate-45" : ""
                         }`}
                       />
@@ -120,9 +118,11 @@ export function FloatingActionButton({
                 side="left"
                 className="bg-destructive text-destructive-foreground"
               >
-                {errors.length === 1
-                  ? "1 error detected"
-                  : `${errors.length} errors detected`}
+                {errors.length === 0
+                  ? "Tool actions"
+                  : errors.length === 1
+                    ? "Tool actions · 1 error detected"
+                    : `Tool actions · ${errors.length} errors detected`}
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -174,10 +174,6 @@ export function FloatingActionButton({
                 <span>Run Internal Tests</span>
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem>
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Settings</span>
-            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

@@ -16,7 +16,11 @@ import { toast } from "sonner";
 interface SaveDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (name: string, description: string, tags: string[]) => void;
+  onSave: (
+    name: string,
+    description: string,
+    tags: string[]
+  ) => void | Promise<unknown>;
   title: string;
   description: string;
 }

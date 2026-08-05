@@ -1,85 +1,86 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { Edit3, Trash2 } from "lucide-react";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Copy, MoreHorizontal, TagIcon, FileText, Edit3 } from "lucide-react";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export interface TagActionsMenuProps {
   tag: string;
-  value: string;
   path?: string;
   /** Optional callback invoked when the user selects Edit Value */
   onEdit?: () => void;
+  /** Optional callback invoked when the user confirms Delete Tag */
+  onDelete?: () => void;
 }
 
 export function TagActionsMenu({
   tag,
-  value,
-  path: _path,
+  path,
   onEdit,
+  onDelete,
 }: TagActionsMenuProps) {
-  const [open, setOpen] = useState(false);
-
-  const handleCopyTag = async () => {
-    await navigator.clipboard.writeText(tag);
-    toast.success(`Tag ${tag} copied to clipboard`);
-    setOpen(false);
-  };
-
-  const handleCopyValue = async () => {
-    await navigator.clipboard.writeText(value);
-    toast.success(`Value copied to clipboard`);
-    setOpen(false);
-  };
-
-  const handleCopyTagAndValue = async () => {
-    await navigator.clipboard.writeText(`${tag}: ${value}`);
-    toast.success(`Tag and value copied to clipboard`);
-    setOpen(false);
-  };
-
-  const handleEdit = () => {
-    setOpen(false);
-    if (onEdit) onEdit();
-  };
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="link"
-          size="icon"
-          className="h-6 w-6 hover:bg-primary/10"
-        >
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuItem onClick={handleEdit}>
-          <Edit3 className="mr-2 h-4 w-4" />
-          <span>Edit Value</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          {/* Separator visual grouping - copy actions below */}
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={handleCopyTag}>
-          <TagIcon className="mr-2 h-4 w-4" />
-          <span>Copy Tag</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={handleCopyValue}>
-          <FileText className="mr-2 h-4 w-4" />
-          <span>Copy Value</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={handleCopyTagAndValue}>
-          <Copy className="mr-2 h-4 w-4" />
-          <span>Copy Tag & Value</span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <div className="flex shrink-0 items-center gap-0.5">
+        {onEdit && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7"
+            onClick={onEdit}
+            aria-label={`Edit value for tag ${tag}`}
+            title="Edit value"
+          >
+            <Edit3 className="size-3.5" />
+          </Button>
+        )}
+        {onDelete && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => setConfirmDelete(true)}
+            aria-label={`Delete tag ${tag}`}
+            title="Delete tag"
+          >
+            <Trash2 className="size-3.5" />
+          </Button>
+        )}
+      </div>
+
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete tag {tag}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes <span className="font-mono">{path || tag}</span> from
+              the payload and recalculates the length of any enclosing
+              constructed tag. Undo is available from the floating action button.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmDelete(false);
+                onDelete?.();
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

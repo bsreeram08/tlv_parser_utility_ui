@@ -5,7 +5,7 @@
  * Automatically detects input format and uses Zod for schema validation.
  */
 
-import { useState, useEffect, type JSX } from "react";
+import { useState, useEffect, useId, type JSX } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,30 @@ import { base16ToBase64, base64ToBase16, isValidHex as isValidHexFormat, isLikel
 
 // Define TLV input format types
 type TlvFormat = "hex" | "base64" | "unknown";
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0;
+}
+
+function detectFormat(value: string): TlvFormat {
+  if (!isNonEmptyString(value)) return "unknown";
+
+  const trimmedValue = value.trim();
+  if (trimmedValue === "") return "unknown";
+
+  if (isValidHexFormat(trimmedValue)) return "hex";
+
+  if (isLikelyBase64(trimmedValue)) {
+    try {
+      window.atob(trimmedValue);
+      return "base64";
+    } catch {
+      // Fall through to unknown.
+    }
+  }
+
+  return "unknown";
+}
 
 interface TlvInputProps {
   onParse: (data: { value: string; format: TlvFormat }) => void;
@@ -30,51 +54,14 @@ export function TlvInput({
   const [inputValue, setInputValue] = useState<string>(initialValue || "");
   const [detectedFormat, setDetectedFormat] = useState<TlvFormat>("unknown");
   const [error, setError] = useState<string | null>(null);
+  const inputId = useId();
 
-  // Safely check if a value is a non-empty string
-  function isNonEmptyString(value: unknown): boolean {
-    return typeof value === "string" && value.length > 0;
-  }
-
-  // Detect format without setting error
-  function detectFormat(value: string): TlvFormat {
-    // Safety check for non-string values
-    if (!isNonEmptyString(value)) {
-      return "unknown";
-    }
-
-    // Now that we know it's a string, we can safely use string methods
-    const trimmedValue = value.trim();
-    if (trimmedValue === "") {
-      return "unknown";
-    }
-
-    // Check for hex format
-    if (isValidHexFormat(trimmedValue)) {
-      return "hex";
-    }
-
-    // Check for Base64 format
-    if (isLikelyBase64(trimmedValue)) {
-      try {
-        // Attempt to decode to verify it's valid Base64
-        window.atob(trimmedValue);
-        return "base64";
-      } catch (e) {
-        // Not valid Base64
-      }
-    }
-
-    return "unknown";
-  }
-
-  // Check initial format once on mount
+  // Keep external loads and examples synchronized with the editable input.
   useEffect(() => {
-    if (isNonEmptyString(initialValue)) {
-      const format = detectFormat(initialValue);
-      setDetectedFormat(format);
-    }
-  }, []);
+    setInputValue(initialValue);
+    setDetectedFormat(detectFormat(initialValue));
+    setError(null);
+  }, [initialValue]);
 
   // Validate input with error reporting
   function validateInput(value: string): TlvFormat {
@@ -117,7 +104,7 @@ export function TlvInput({
     setDetectedFormat(format);
   }
 
-  function handleSubmit(event: React.FormEvent): void {
+  function handleSubmit(event: React.SyntheticEvent<HTMLFormElement>): void {
     event.preventDefault();
 
     if (!isNonEmptyString(inputValue) || inputValue.trim() === "") {
@@ -176,12 +163,12 @@ export function TlvInput({
   }
 
   return (
-    <div className="space-y-4 w-full">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-2">
+    <div className="w-full space-y-3">
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <div className="space-y-1.5">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
-              <Label htmlFor="tlv-input">Enter TLV Data</Label>
+              <Label htmlFor={inputId}>Enter TLV Data</Label>
               {detectedFormat !== "unknown" && (
                 <Badge variant="outline">
                   {detectedFormat === "hex" ? "Hex" : "Base64"} detected
@@ -223,7 +210,7 @@ export function TlvInput({
           </div>
 
           <Textarea
-            id="tlv-input"
+            id={inputId}
             placeholder="Enter hex (9F2608C1C2C3C4C5C6C7C8) or Base64 (nyYIwcLDxMXGx8g=)"
             value={inputValue}
             onChange={handleInputChange}

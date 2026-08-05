@@ -94,30 +94,24 @@ export function EnhancedTestsDrawer({
   // Load tests from the database
   const loadTests = useCallback(async (): Promise<void> => {
     try {
-      let loadedTests;
-      if (testType === "tlv") {
-        loadedTests = await db.getTlvTests();
-      } else {
-        loadedTests = await db.getIsoTests();
-      }
+      const loadedTests: Array<SavedTlvTest | SavedIsoTest> =
+        testType === "tlv" ? await db.getTlvTests() : await db.getIsoTests();
 
-      // DEBUG: Log any empty string properties that could cause issues
-      loadedTests.forEach((test, index) => {
+      const sanitizedTests = loadedTests.map((test, index) => {
         const emptyProps = findEmptyStringProperties(test);
         if (emptyProps.length > 0) {
           console.warn(
             `Test ${index} (${test.name}) has empty string properties:`,
             emptyProps
           );
-
-          // For testing, fix this test object - this is a temporary solution
-          // In production code, you would fix this at the source (database or save function)
-          loadedTests[index] = sanitizeEmptyStrings(test);
+          return sanitizeEmptyStrings(test) as SavedTlvTest | SavedIsoTest;
         }
+
+        return test;
       });
 
-      setTests(loadedTests);
-      setFilteredTests(loadedTests);
+      setTests(sanitizedTests);
+      setFilteredTests(sanitizedTests);
     } catch (error) {
       toast.error(
         `Error loading saved tests: ${

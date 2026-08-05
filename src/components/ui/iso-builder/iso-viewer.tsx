@@ -17,9 +17,6 @@ import {
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FloatingActionButton } from "@/components/ui/fab";
@@ -139,20 +136,14 @@ export function IsoViewer(): JSX.Element {
 
   return (
     <>
-      <Card className="w-full max-w-5xl mx-auto">
-        <CardHeader>
-          <CardTitle>ISO 8583 Message Parser</CardTitle>
-          <CardDescription>
-            Parse and analyze ISO 8583 financial transaction messages
-          </CardDescription>
-        </CardHeader>
+      <Card className="w-full">
         <CardContent>
           <Tabs
             value={activeTab}
             onValueChange={setActiveTab}
             className="w-full"
           >
-            <TabsList className="grid grid-cols-2 mb-4">
+            <TabsList className="mb-2 grid w-full max-w-xs grid-cols-2">
               <TabsTrigger value="input">Input</TabsTrigger>
               <TabsTrigger value="results">Results</TabsTrigger>
             </TabsList>

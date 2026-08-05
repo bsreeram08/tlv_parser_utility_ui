@@ -8,6 +8,10 @@ import { TransactionDateTag } from "./transaction-date";
 import { CurrencyCodeTag } from "./currency-code";
 import { TransactionTypeTag } from "./transaction-type";
 import { AmountAuthorisedTag } from "./amount-authorised";
+import { BitfieldTag } from "./bitfield-tag";
+import { bitfieldSpecs } from "@/utils/tlv/bitfield-specs";
+import { CvmListTag, DolTag, Track2Tag } from "./payment-structure-tags";
+import { CountryCodeTag } from "./country-code";
 
 // Interface for tag renderer props
 export interface TagRendererProps {
@@ -68,8 +72,36 @@ const tagRegistry: Record<string, TagRenderer> = {
     <AmountAuthorisedTag value={value} onChange={onChange || (() => {})} />
   ),
 
+  // EMV Terminal Country Code (ISO 3166-1, not to be confused with 5F2A)
+  "9F1A": ({ value, onChange }) => (
+    <CountryCodeTag value={value} onChange={onChange || (() => {})} />
+  ),
+
+  // Track 2 Equivalent Data / Track 2 Data
+  "57": ({ tag, value }) => <Track2Tag tag={tag} value={value} />,
+  "9F6B": ({ tag, value }) => <Track2Tag tag={tag} value={value} />,
+
+  // Cardholder Verification Method List
+  "8E": ({ value }) => <CvmListTag value={value} />,
+
+  // Data Object Lists (tag-and-length lists)
+  "9F38": ({ tag, value }) => <DolTag tag={tag} value={value} />,
+  "8C": ({ tag, value }) => <DolTag tag={tag} value={value} />,
+  "8D": ({ tag, value }) => <DolTag tag={tag} value={value} />,
+  "97": ({ tag, value }) => <DolTag tag={tag} value={value} />,
+  "9F4F": ({ tag, value }) => <DolTag tag={tag} value={value} />,
+
   // Add more tag-specific renderers here
 };
+
+// Bit-mapped / enum tags are all rendered by the one generic BitfieldTag,
+// driven by the data-only specs. Bespoke renderers above take precedence.
+for (const [tag, spec] of Object.entries(bitfieldSpecs)) {
+  if (tag in tagRegistry) continue;
+  tagRegistry[tag] = ({ value, onChange }) => (
+    <BitfieldTag spec={spec} value={value} onChange={onChange || (() => {})} />
+  );
+}
 
 /**
  * Get a tag-specific renderer component if available

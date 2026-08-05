@@ -113,10 +113,7 @@ export function CVMResultsTag({ value, onChange }: CVMResultsProps) {
     setCvmResult(result);
   };
 
-  // Build hex from components
-  const buildHexFromComponents = () => {
-    return (cvmType + cvmCondition + cvmResult).toUpperCase();
-  };
+  const componentHex = (cvmType + cvmCondition + cvmResult).toUpperCase();
 
   // Initialize when value changes
   useEffect(() => {
@@ -126,9 +123,9 @@ export function CVMResultsTag({ value, onChange }: CVMResultsProps) {
   // Update hex when components change
   useEffect(() => {
     if (isEditing) {
-      setHexValue(buildHexFromComponents());
+      setHexValue(componentHex);
     }
-  }, [cvmType, cvmCondition, cvmResult, isEditing]);
+  }, [componentHex, isEditing]);
 
   // Handle manual hex input
   const handleHexInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -142,9 +139,8 @@ export function CVMResultsTag({ value, onChange }: CVMResultsProps) {
 
   // Handle save
   const handleSave = () => {
-    const newHexValue = buildHexFromComponents();
-    setHexValue(newHexValue);
-    onChange(newHexValue);
+    setHexValue(componentHex);
+    onChange(componentHex);
     setIsEditing(false);
   };
 

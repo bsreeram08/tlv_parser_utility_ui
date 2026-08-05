@@ -4,7 +4,7 @@
  * A component for entering and validating ISO 8583 message data.
  */
 
-import { useEffect, useState, type JSX } from "react";
+import { useEffect, useId, useState, type JSX } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertCircle, Eraser, FlaskConical } from "lucide-react";
@@ -62,6 +62,7 @@ export function IsoInput({
   onLoadExample,
 }: IsoInputProps): JSX.Element {
   const [error, setError] = useState<string | null>(null);
+  const messageId = useId();
 
   // Set up form with default values
   const form = useForm<z.infer<typeof formSchema>>({
@@ -125,15 +126,15 @@ export function IsoInput({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 w-full">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="w-full space-y-3">
         <FormField
           control={form.control}
           name="message"
-            render={({ field }) => (
+          render={({ field }) => (
               <FormItem>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-2">
-                    <FormLabel htmlFor="iso8583-message">
+                    <FormLabel htmlFor={messageId}>
                       ISO 8583 Message
                     </FormLabel>
                     {trimmedMessage && (
@@ -168,22 +169,21 @@ export function IsoInput({
                 </div>
                 <FormControl>
                   <Textarea
-                    id="iso8583-message"
+                    id={messageId}
                     placeholder="Enter a text ISO 8583 message or a hex-encoded binary/EBCDIC payload"
-                    className="font-mono h-36 resize-y"
+                    className="h-24 resize-y font-mono"
                     {...field}
                   />
                 </FormControl>
                 <FormDescription>
-                  Supports plain-text ISO 8583 messages and hex-encoded payloads with ASCII or EBCDIC MTIs.
-                  Paste a message, or load an example to inspect a parsed result quickly.
+                  Plain text and hex-encoded ASCII or EBCDIC payloads are supported.
                 </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(12rem,0.7fr)_minmax(24rem,1.3fr)]">
           <FormField
             control={form.control}
             name="version"
@@ -219,12 +219,12 @@ export function IsoInput({
             )}
           />
 
-          <div className="space-y-4">
+          <div className="grid gap-2 sm:grid-cols-2">
             <FormField
               control={form.control}
               name="binaryBitmap"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                <FormItem className="flex flex-row items-center justify-between rounded-md border p-2">
                   <div className="space-y-0.5">
                     <FormLabel>Binary Bitmap</FormLabel>
                     <FormDescription>
@@ -245,7 +245,7 @@ export function IsoInput({
               control={form.control}
               name="validateFields"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                <FormItem className="flex flex-row items-center justify-between rounded-md border p-2">
                   <div className="space-y-0.5">
                     <FormLabel>Validate Fields</FormLabel>
                     <FormDescription>

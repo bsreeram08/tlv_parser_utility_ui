@@ -1,54 +1,42 @@
 /**
- * Compact TLV Display Component
- *
- * A cleaner, more compact view of TLV data with all tags visible at once
- * and expandable details on click.
+ * Dense TLV data table. Raw tag data is always visible; richer decoders are an
+ * explicit secondary action instead of forcing every row into an accordion.
  */
 
-import { useState, type JSX } from "react";
-import { sanitizeSelectValues } from "@/utils/select-helpers";
-import { type TlvElement, type TlvParsingResult } from "@/types/tlv";
+import { useEffect, useMemo, useRef, useState, type JSX } from "react";
+import { Copy, CornerDownRight, HelpCircle, ScanSearch, Search, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
-  CardDescription,
 } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import {
-  Collapsible,
-  CollapsibleTrigger,
-  CollapsibleContent,
-} from "@/components/ui/collapsible";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-  TooltipProvider,
-} from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
-import { HelpCircle, ChevronDown, ChevronRight } from "lucide-react";
+import { sanitizeSelectValues } from "@/utils/select-helpers";
+import { type TlvElement, type TlvParsingResult } from "@/types/tlv";
 import { CustomTagForm } from "@/components/ui/custom-tags";
 import { TagActionsMenu } from "@/components/ui/tlv-tags/tag-actions-menu";
 import { db } from "@/utils/db/db";
 import { loadAndRegisterCustomTags } from "@/utils/tlv/load-custom-tags";
 import {
-  hasCustomRenderer,
   getTagRenderer,
+  hasCustomRenderer,
 } from "@/components/ui/tlv-tags/tag-registry";
 import { tlvValueToAscii } from "@/utils/tlv";
+import { encodeLength } from "@/utils/tlv/tlv-edit";
+import { cn } from "@/lib/utils";
 import {
   type CustomTagCreationParams,
   CustomTagDataFormat,
@@ -56,40 +44,111 @@ import {
   LengthRuleType,
 } from "@/types/custom-tag";
 
+function filterElementsByQuery(
+  elements: TlvElement[],
+  query: string
+): TlvElement[] {
+  const needle = query.trim().toUpperCase();
+  if (!needle) return elements;
+
+  const matches = (element: TlvElement) =>
+    element.tag.toUpperCase().includes(needle) ||
+    (element.tagInfo?.name || "").toUpperCase().includes(needle) ||
+    element.value.toUpperCase().includes(needle);
+
+  return elements.reduce<TlvElement[]>((kept, element) => {
+    const keptChildren = element.children
+      ? filterElementsByQuery(element.children, query)
+      : undefined;
+
+    if (matches(element)) kept.push(element);
+    else if (keptChildren && keptChildren.length > 0) {
+      kept.push({ ...element, children: keptChildren });
+    }
+    return kept;
+  }, []);
+}
+
+type FlatTlvRow = {
+  element: TlvElement;
+  depth: number;
+  path: string;
+  key: string;
+};
+
+function flattenElements(
+  elements: TlvElement[],
+  parentPath = "",
+  depth = 0
+): FlatTlvRow[] {
+  return elements.flatMap((element, index) => {
+    const path = parentPath ? `${parentPath}:${element.tag}` : element.tag;
+    const row: FlatTlvRow = {
+      element,
+      depth,
+      path,
+      key: `${path}-${index}`,
+    };
+    return element.children?.length
+      ? [row, ...flattenElements(element.children, path, depth + 1)]
+      : [row];
+  });
+}
+
+function fullTlv(tag: string, value: string): string {
+  return `${tag}${encodeLength(value.length / 2)}${value}`;
+}
+
+async function copyText(value: string, message: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(value);
+    toast.success(message);
+  } catch {
+    toast.error("Copy failed");
+  }
+}
+
 interface CompactTlvDisplayProps {
   result: TlvParsingResult | null;
   onRefresh?: () => void;
+  /** Kept for source compatibility; rows are now always visible. */
   expandAll?: boolean;
-  /** Optional callback to request editing a specific element. Signature: (path, newHex) */
   onEditElement?: (path: string, newValueHex: string) => void;
-  /** Optional path of element recently edited to highlight */
+  onDeleteElement?: (path: string) => void;
   highlightPath?: string;
 }
 
 export function CompactTlvDisplay({
   result,
   onRefresh,
-  expandAll: externalExpandAll,
   onEditElement,
+  onDeleteElement,
   highlightPath,
 }: CompactTlvDisplayProps): JSX.Element {
-  const [internalExpandAll, setInternalExpandAll] = useState(false);
-
-  // Use external expandAll if provided, otherwise use internal state
-  const expandAll =
-    externalExpandAll !== undefined ? externalExpandAll : internalExpandAll;
+  const [query, setQuery] = useState("");
+  const allRows = useMemo(
+    () => (result ? flattenElements(result.elements) : []),
+    [result]
+  );
+  const visibleRows = useMemo(
+    () =>
+      result
+        ? flattenElements(filterElementsByQuery(result.elements, query))
+        : [],
+    [query, result]
+  );
 
   if (!result) {
     return (
-      <div className="text-center p-8 text-muted-foreground">
+      <div className="p-6 text-center text-xs text-muted-foreground">
         Enter TLV data and click Parse to see results here
       </div>
     );
   }
 
-  if (result.elements.length === 0) {
+  if (allRows.length === 0) {
     return (
-      <div className="text-center p-8 text-muted-foreground">
+      <div className="p-6 text-center text-xs text-muted-foreground">
         No TLV elements were parsed
       </div>
     );
@@ -98,325 +157,229 @@ export function CompactTlvDisplay({
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-lg flex items-center justify-between">
-          TLV Data
-          {externalExpandAll === undefined && (
-            <Button
-              variant="outline"
-              className="mt-2"
-              onClick={() => setInternalExpandAll(!internalExpandAll)}
-            >
-              {expandAll ? "Collapse All" : "Expand All"}
-              {expandAll ? (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              )}
-            </Button>
-          )}
-        </CardTitle>
-        <CardDescription>
-          {result.elements.length} tag{result.elements.length !== 1 ? "s" : ""}{" "}
-          found
+        <div className="flex flex-wrap items-center gap-2">
+          <CardTitle className="text-sm">TLV Data</CardTitle>
+          <Badge variant="secondary" className="text-[10px]">
+            {allRows.length} tag{allRows.length === 1 ? "" : "s"}
+          </Badge>
+          <Button
+            variant="outline"
+            size="sm"
+            className="ml-auto h-7 gap-1.5 px-2 text-xs"
+            onClick={() => void copyText(result.rawHex, "Complete TLV copied")}
+          >
+            <Copy className="size-3.5" />
+            Copy TLV
+          </Button>
+        </div>
+        <CardDescription className="text-xs">
+          Raw values are visible and selectable. Inspect only when you need a decoded view.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col gap-2">
-          {result.elements.map((element, index) => {
-            // eslint-disable-next-line react-hooks/rules-of-hooks
-            const [isOpen, setIsOpen] = useState(false);
-            return (
-              <CompactTlvElement
-                key={index}
-                element={element}
-                onRefresh={onRefresh}
-                path={element.tag}
-                isOpen={expandAll || isOpen}
-                setIsOpen={setIsOpen}
-                onEditElement={onEditElement}
-                highlightPath={highlightPath}
-              />
-            );
-          })}
+        <div className="relative mb-2">
+          <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Filter by tag, name, or value"
+            aria-label="Filter tags"
+            className="h-8 pl-8 pr-8 text-xs"
+          />
+          {query && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Clear filter"
+              className="absolute right-0.5 top-1/2 size-7 -translate-y-1/2"
+              onClick={() => setQuery("")}
+            >
+              <X className="size-3.5" />
+            </Button>
+          )}
         </div>
+
+        {visibleRows.length === 0 ? (
+          <div className="p-6 text-center text-xs text-muted-foreground">
+            No tags match “{query.trim()}”
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-md border">
+            <div className="hidden grid-cols-[5rem_minmax(10rem,0.7fr)_4.5rem_minmax(16rem,1.3fr)] gap-2 border-b bg-muted/40 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground md:grid">
+              <div>Tag</div>
+              <div>Name</div>
+              <div>Length</div>
+              <div>Value</div>
+            </div>
+            <div className="divide-y">
+              {visibleRows.map((row) => (
+                <TlvTableRow
+                  key={row.key}
+                  {...row}
+                  onRefresh={onRefresh}
+                  onEditElement={onEditElement}
+                  onDeleteElement={onDeleteElement}
+                  highlighted={highlightPath === row.path}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
 }
 
-interface CompactTlvElementProps {
-  element: TlvElement;
-  onRefresh?: () => void;
-  depth?: number;
-  path?: string;
-  isOpen: boolean;
-  setIsOpen: (isOpen: boolean) => void;
-  onEditElement?: (path: string, newValueHex: string) => void;
-  highlightPath?: string;
-}
-
-function CompactTlvElement({
+function TlvTableRow({
   element,
+  depth,
+  path,
   onRefresh,
-  depth = 0,
-  isOpen,
-  setIsOpen,
-  path = "",
   onEditElement,
-  highlightPath,
-}: CompactTlvElementProps): JSX.Element {
+  onDeleteElement,
+  highlighted,
+}: FlatTlvRow & {
+  onRefresh?: () => void;
+  onEditElement?: (path: string, newValueHex: string) => void;
+  onDeleteElement?: (path: string) => void;
+  highlighted: boolean;
+}): JSX.Element {
   const [defineTagOpen, setDefineTagOpen] = useState(false);
-  const [activeValueTab, setActiveValueTab] = useState<string>("hex");
+  const [inspectOpen, setInspectOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const [editValue, setEditValue] = useState(element.value || "");
+  const [editValue, setEditValue] = useState(element.value);
+  const [exiting, setExiting] = useState(false);
+  const exitTimer = useRef<number | null>(null);
+  const asciiValue = tlvValueToAscii(element.value);
+  const hasAscii =
+    asciiValue !== element.value && asciiValue.trim().length > 0;
+  const hasDecoder = hasCustomRenderer(element.tag);
+  const hasDetails = Boolean(element.tagInfo?.description || hasAscii || hasDecoder);
 
-  // Try to display ASCII representation for primitive values
-  const displayValue = element.value;
-  const asciiValue = tlvValueToAscii(displayValue);
-  const hasAsciiRepresentation =
-    asciiValue !== displayValue && asciiValue.trim().length > 0;
+  useEffect(() => setEditValue(element.value), [element.value]);
 
-  // Create a custom tag definition from this unknown tag
-  const handleCreateCustomTag = async (tagParams: CustomTagCreationParams) => {
-    // Sanitize tag params to prevent empty string values
-    const sanitizedParams = sanitizeSelectValues(tagParams);
+  useEffect(
+    () => () => {
+      if (exitTimer.current !== null) {
+        window.clearTimeout(exitTimer.current);
+      }
+    },
+    []
+  );
 
-    // Add the custom tag to the database
+  const handleDelete = () => {
+    if (!onDeleteElement || exiting) return;
+
+    setExiting(true);
+    const reducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+    exitTimer.current = window.setTimeout(
+      () => onDeleteElement(path),
+      reducedMotion ? 100 : 120
+    );
+  };
+
+  const handleCreateCustomTag = async (
+    tagParams: CustomTagCreationParams
+  ) => {
     await db.addCustomTag({
-      ...sanitizedParams,
+      ...sanitizeSelectValues(tagParams),
       created: new Date(),
     });
-
-    // Refresh the display if provided
-    if (onRefresh) {
-      onRefresh();
-    }
-    // Register newly added tag in runtime registry
     await loadAndRegisterCustomTags();
+    onRefresh?.();
   };
 
-  // Default values for the custom tag form based on the unknown tag
-  const getInitialTagParams = (): Partial<CustomTagCreationParams> => {
-    return {
-      id: element.tag,
-      name: `Custom Tag ${element.tag}`,
-      description: "Custom tag definition for unknown tag",
-      dataFormat: CustomTagDataFormat.Binary,
-      lengthRule: {
-        type: LengthRuleType.Fixed,
-        fixed: element.length,
-      },
-      displayFormat: DisplayFormat.Hex,
-    };
+  const initialTagParams: Partial<CustomTagCreationParams> = {
+    id: element.tag,
+    name: `Custom Tag ${element.tag}`,
+    description: "Custom tag definition for unknown tag",
+    dataFormat: CustomTagDataFormat.Binary,
+    lengthRule: { type: LengthRuleType.Fixed, fixed: element.length },
+    displayFormat: DisplayFormat.Hex,
   };
 
-  // Determine tag component UI
-  const renderTagSpecificUI = () => {
-    if (hasCustomRenderer(element.tag)) {
-      const renderer = getTagRenderer(element.tag);
-      if (renderer) {
-        return renderer({
-          tag: element.tag,
-          value: element.value,
-          onChange: (newValue) => {
-            // In a real implementation, you'd handle value updates here
-            console.log(`Value changed for ${element.tag}: ${newValue}`);
-            // If needed, update the parsed data and call onRefresh
-            if (onRefresh) onRefresh();
-          },
-        });
-      }
-    }
-    return null;
-  };
+  const renderer = hasDecoder ? getTagRenderer(element.tag) : undefined;
 
   return (
     <div
+      data-highlighted={highlighted}
+      data-structural-entry={highlighted}
+      data-exiting={exiting}
+      aria-hidden={exiting || undefined}
       className={cn(
-        "rounded border relative transition-colors",
-        highlightPath === path && "ring-2 ring-primary/60 border-primary/60"
+        "tlv-mutation-feedback tlv-structural-row relative grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-2 gap-y-1 px-2 py-1.5 text-xs hover:bg-muted/25 md:grid-cols-[5rem_minmax(10rem,0.7fr)_4.5rem_minmax(16rem,1.3fr)] md:items-start",
+        element.isUnknown && "bg-muted/20"
       )}
     >
-      {/* Position the actions menu outside the button to avoid nesting issues */}
-      <div className="absolute top-2 right-2 z-10 flex items-center space-x-1">
+      <div
+        className="flex min-w-0 items-center gap-1"
+        style={{ paddingLeft: `${Math.min(depth, 4) * 10}px` }}
+      >
+        {depth > 0 && <CornerDownRight className="size-3 shrink-0 text-muted-foreground" />}
+        <Badge
+          variant={element.isUnknown ? "outline" : "secondary"}
+          className="h-5 px-1.5 font-mono text-[10px]"
+        >
+          {element.tag}
+        </Badge>
+      </div>
+
+      <div className="min-w-0 self-center font-medium leading-snug">
+        {element.tagInfo?.name || "Unknown tag"}
+      </div>
+
+      <Badge variant="outline" className="h-5 self-center px-1.5 text-[10px]">
+        {element.length} B
+      </Badge>
+
+      <div className="col-span-3 flex min-w-0 items-start gap-1 md:col-span-1">
+        <code className="min-w-0 flex-1 select-all break-all rounded bg-muted/55 px-1.5 py-1 font-mono text-[11px] leading-4">
+          {element.value || "<empty>"}
+        </code>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="size-7 shrink-0 p-0"
+          onClick={() => void copyText(element.value, `Value for ${element.tag} copied`)}
+          aria-label={`Copy value for tag ${element.tag}`}
+          title={`Copy value for tag ${element.tag}`}
+        >
+          <Copy className="size-3.5" />
+        </Button>
+        {hasDetails && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="size-7 shrink-0 p-0"
+            onClick={() => setInspectOpen(true)}
+            aria-label={`Inspect decoded value for tag ${element.tag}`}
+            title={`Inspect decoded value for tag ${element.tag}`}
+          >
+            <ScanSearch className="size-3.5" />
+          </Button>
+        )}
         {element.isUnknown && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 rounded-full p-0 hover:bg-muted/80"
-                  onClick={() => setDefineTagOpen(true)}
-                >
-                  <HelpCircle className="h-4 w-4 text-warning" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                <p>Define Custom Tag</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7 shrink-0"
+            onClick={() => setDefineTagOpen(true)}
+            aria-label={`Define unknown tag ${element.tag}`}
+            title="Define custom tag"
+          >
+            <HelpCircle className="size-3.5" />
+          </Button>
         )}
         <TagActionsMenu
           tag={element.tag}
-          value={element.value}
-          path={path || element.tag}
-          onEdit={() => setEditOpen(true)}
+          path={path}
+          onEdit={onEditElement ? () => setEditOpen(true) : undefined}
+          onDelete={onDeleteElement ? handleDelete : undefined}
         />
       </div>
 
-      <Collapsible open={isOpen} onOpenChange={setIsOpen} className="">
-        <CollapsibleTrigger asChild>
-          <Button
-            variant="ghost"
-            className={cn(
-              "flex w-full items-start justify-between pr-10 rounded-none text-left",
-              element.isUnknown
-                ? "bg-muted/60 hover:bg-muted/80"
-                : "hover:bg-muted",
-              // Indentation for nested elements
-              depth > 0 && "ml-" + depth * 4
-            )}
-          >
-            <div className="flex items-center space-x-3 overflow-hidden">
-              <div className="flex-shrink-0">
-                {isOpen ? (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                )}
-              </div>
-
-              <div className="flex-shrink-0">
-                <Badge
-                  variant={element.isUnknown ? "outline" : "secondary"}
-                  className={cn("font-mono")}
-                >
-                  {element.tag}
-                </Badge>
-              </div>
-
-              <div className="truncate font-medium">
-                {element.tagInfo?.name || "Unknown Tag"}
-              </div>
-            </div>
-
-            <div className="flex items-center text-xs text-muted-foreground">
-              <div className="mr-4">
-                <Badge variant="outline" className="font-mono text-xs">
-                  {element.length} bytes
-                </Badge>
-              </div>
-              <div className="w-24 truncate font-mono text-xs">
-                {element.value ? element.value : "<empty>"}
-              </div>
-            </div>
-          </Button>
-        </CollapsibleTrigger>
-
-        <CollapsibleContent className="p-3 pt-0 border-t">
-          <div className="p-3 pt-0 border-t">
-            {" "}
-            {/* Tag description */}
-            {element.tagInfo && (
-              <div className="text-sm mt-3 text-muted-foreground">
-                {element.tagInfo.description}
-              </div>
-            )}
-            {/* Value display with tabs */}
-            {element.length > 0 && (
-              <div className="mt-3 mb-3">
-                <Tabs value={activeValueTab} onValueChange={setActiveValueTab}>
-                  <TabsList className="h-8">
-                    <TabsTrigger value="hex" className="text-xs">
-                      Hex
-                    </TabsTrigger>
-                    {hasAsciiRepresentation && (
-                      <TabsTrigger value="ascii" className="text-xs">
-                        ASCII
-                      </TabsTrigger>
-                    )}
-                    {/* Add more tabs for different interpretations */}
-                    <TabsTrigger value="binary" className="text-xs">
-                      Binary
-                    </TabsTrigger>
-                    <TabsTrigger value="decimal" className="text-xs">
-                      Decimal
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="hex" className="mt-2">
-                    <div className="bg-muted p-2 rounded font-mono text-xs break-all">
-                      {displayValue}
-                    </div>
-                  </TabsContent>
-
-                  {hasAsciiRepresentation && (
-                    <TabsContent value="ascii" className="mt-2">
-                      <div className="bg-muted p-2 rounded font-mono text-xs break-all">
-                        {asciiValue}
-                      </div>
-                    </TabsContent>
-                  )}
-
-                  <TabsContent value="binary" className="mt-2">
-                    <div className="bg-muted p-2 rounded font-mono text-xs break-all">
-                      {/* Convert hex to binary representation */}
-                      {displayValue
-                        .match(/.{1,2}/g)
-                        ?.map((byte) =>
-                          parseInt(byte, 16).toString(2).padStart(8, "0")
-                        )
-                        .join(" ")}
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="decimal" className="mt-2">
-                    <div className="bg-muted p-2 rounded font-mono text-xs break-all">
-                      {/* Convert hex to decimal representation */}
-                      {displayValue
-                        .match(/.{1,2}/g)
-                        ?.map((byte) => parseInt(byte, 16).toString(10))
-                        .join(" ")}
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              </div>
-            )}
-            {/* Tag-specific UI component */}
-            {renderTagSpecificUI()}
-            {/* Nested elements */}
-            {element.children && element.children.length > 0 && (
-              <div className="mt-4">
-                <div className="text-xs font-medium mb-2">Nested Elements:</div>
-                <div className="space-y-2">
-                  {element.children.map((child, index) => {
-                    const childPath = path ? `${path}:${child.tag}` : child.tag;
-                    // eslint-disable-next-line react-hooks/rules-of-hooks
-                    const [isOpen, setIsOpen] = useState(false);
-                    return (
-                      <CompactTlvElement
-                        key={index}
-                        element={child}
-                        depth={depth + 1}
-                        onRefresh={onRefresh}
-                        path={childPath}
-                        isOpen={isOpen}
-                        setIsOpen={setIsOpen}
-                        onEditElement={onEditElement}
-                        highlightPath={highlightPath}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
-
-      {/* Custom Tag Definition Dialog */}
       {element.isUnknown && defineTagOpen && (
         <CustomTagForm
           isOpen={defineTagOpen}
@@ -424,92 +387,99 @@ function CompactTlvElement({
           onSave={handleCreateCustomTag}
           title={`Define Custom Tag: ${element.tag}`}
           description="Create a custom tag definition for this unknown tag"
-          initialValues={getInitialTagParams()}
+          initialValues={initialTagParams}
         />
       )}
 
-      {/* Edit Value Dialog (proper Dialog root) */}
+      <Dialog open={inspectOpen} onOpenChange={setInspectOpen}>
+        <DialogContent className="max-h-[85vh] max-w-2xl overflow-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Badge variant="secondary" className="font-mono">
+                {element.tag}
+              </Badge>
+              {element.tagInfo?.name || "Unknown tag"}
+            </DialogTitle>
+            <DialogDescription>
+              {element.tagInfo?.description || `${element.length} byte TLV value`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <div>
+              <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Raw value
+              </div>
+              <div className="flex items-start gap-1">
+                <code className="min-w-0 flex-1 select-all break-all rounded bg-muted p-2 font-mono text-xs">
+                  {element.value || "<empty>"}
+                </code>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void copyText(element.value, `Value for ${element.tag} copied`)}
+                >
+                  <Copy className="size-3.5" /> Copy
+                </Button>
+              </div>
+            </div>
+            {hasAscii && (
+              <div>
+                <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  ASCII
+                </div>
+                <code className="block select-all break-all rounded bg-muted p-2 font-mono text-xs">
+                  {asciiValue}
+                </code>
+              </div>
+            )}
+            {renderer?.({
+              tag: element.tag,
+              value: element.value,
+              onChange: (value) => onEditElement?.(path, value.toUpperCase()),
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Value: {element.tag}</DialogTitle>
             <DialogDescription>
-              Enter new hex value for this tag (no spaces)
+              Enter an even number of hexadecimal characters.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-2 space-y-3">
-            <input
-              className="w-full bg-muted p-2 rounded font-mono"
+          <div className="space-y-2">
+            <Input
+              className="font-mono"
               value={editValue}
-              onChange={(e) =>
+              onChange={(event) =>
                 setEditValue(
-                  e.target.value.replace(/[^0-9a-fA-F]/g, "").toUpperCase()
+                  event.target.value.replace(/[^0-9a-fA-F]/g, "").toUpperCase()
                 )
               }
               placeholder="Hex value"
               autoFocus
             />
-            {/* Preview section */}
             <div>
-              <div className="text-xs text-muted-foreground mb-1">
-                Preview (Tag + Length + Value)
+              <div className="mb-1 text-[10px] text-muted-foreground">
+                Tag + length + value
               </div>
-              <div className="flex items-start gap-2">
-                <div className="flex-1 bg-muted p-2 rounded font-mono text-xs break-all">
-                  {(() => {
-                    const newLen = Math.floor((editValue || "").length / 2);
-                    const toHex = (n: number, width = 2) =>
-                      n.toString(16).toUpperCase().padStart(width, "0");
-                    let newLengthField = "";
-                    if (newLen < 0x80) {
-                      newLengthField = toHex(newLen, 2);
-                    } else {
-                      const bytes: number[] = [];
-                      let tmp = newLen;
-                      while (tmp > 0) {
-                        bytes.unshift(tmp & 0xff);
-                        tmp >>= 8;
-                      }
-                      newLengthField =
-                        toHex(0x80 | bytes.length, 2) +
-                        bytes.map((b) => toHex(b, 2)).join("");
-                    }
-                    return `${element.tag}${newLengthField}${editValue || ""}`;
-                  })()}
-                </div>
+              <div className="flex items-start gap-1">
+                <code className="min-w-0 flex-1 select-all break-all rounded bg-muted p-2 font-mono text-xs">
+                  {fullTlv(element.tag, editValue)}
+                </code>
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => {
-                    const preview = (() => {
-                      const newLen = Math.floor((editValue || "").length / 2);
-                      const toHex = (n: number, width = 2) =>
-                        n.toString(16).toUpperCase().padStart(width, "0");
-                      let newLengthField = "";
-                      if (newLen < 0x80) {
-                        newLengthField = toHex(newLen, 2);
-                      } else {
-                        const bytes: number[] = [];
-                        let tmp = newLen;
-                        while (tmp > 0) {
-                          bytes.unshift(tmp & 0xff);
-                          tmp >>= 8;
-                        }
-                        newLengthField =
-                          toHex(0x80 | bytes.length, 2) +
-                          bytes.map((b) => toHex(b, 2)).join("");
-                      }
-                      return `${element.tag}${newLengthField}${
-                        editValue || ""
-                      }`;
-                    })();
-                    navigator.clipboard
-                      .writeText(preview)
-                      .then(() => toast.success("Preview copied"))
-                      .catch(() => toast.error("Copy failed"));
-                  }}
+                  onClick={() =>
+                    void copyText(
+                      fullTlv(element.tag, editValue),
+                      "Edited TLV preview copied"
+                    )
+                  }
                 >
-                  Copy
+                  <Copy className="size-3.5" /> Copy
                 </Button>
               </div>
             </div>
@@ -520,20 +490,11 @@ function CompactTlvElement({
             </Button>
             <Button
               onClick={() => {
-                if (
-                  !/^[0-9A-F]*$/.test(editValue) ||
-                  editValue.length % 2 !== 0
-                ) {
-                  toast.error(
-                    "Invalid hex value. Ensure only hex digits and even length."
-                  );
+                if (!/^[0-9A-F]*$/.test(editValue) || editValue.length % 2 !== 0) {
+                  toast.error("Use only hex digits and an even number of characters.");
                   return;
                 }
-                if (onEditElement) {
-                  onEditElement(path || element.tag, editValue);
-                } else if (onRefresh) {
-                  onRefresh();
-                }
+                onEditElement?.(path, editValue);
                 setEditOpen(false);
               }}
             >

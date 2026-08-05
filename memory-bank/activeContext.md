@@ -1,6 +1,16 @@
 # Active Context
 
-## Recent Changes (2025-05-14)
+## Recent Changes (2026-08-05)
+
+### Astro and Bearnie Migration
+
+- Astro now owns the document, route, metadata, global styles, and static production output.
+- Bearnie is installed as source-owned Astro UI under `src/components/bearnie/`.
+- The stateful tool canvas remains one deliberate React island so pane ordering, keyboard control, drag state, persistence, and tool coordination share a single client boundary.
+- Tool implementations are lazy-loaded from the registry, keeping the initial workspace bundle compact.
+- Vite and shadcn project configuration were removed; existing React UI primitives remain internal compatibility adapters using Bearnie semantic tokens.
+- Bun is the sole package manager and `bun.lock` is the canonical lockfile.
+- The production build rejects the malicious `keyv@6.0.0` release associated with GHSA-3p9h-f68w-m6fx.
 
 ### UI Theme and Color Fixes
 
@@ -46,10 +56,11 @@
 
 ## Current Work Focus
 
-- Implementing enhanced TLV parsing with custom tag definition (Ticket EMV-123)
-- Supporting unknown tag display in the TLV parser
-- Creating a tag comparison tool with visual differencing
-- Improving TLV data storage and retrieval functionality
+- Dense, keyboard-first multi-tool workspace UX
+- Consistent horizontal pane geometry across all payment tools
+- Accessible Mac shortcuts, tool movement, collapse, close, zoom, tabs, and archive flows
+- Native Bearnie composition for new Astro-owned interface surfaces
+- Retaining performant lazy boundaries for tool implementations
 
 ## Recent Changes
 
@@ -104,6 +115,6 @@
 
 - React 19 introduces new features that can improve performance for this application
 - Proper type definitions for payment industry standards will be critical for maintainability
-- Shadcn/UI components provide accessibility features needed for enterprise applications
+- Bearnie components provide the source-owned Astro design layer; retained Radix primitives provide accessible behavior inside the React island
 - Careful state management will be essential for complex form handling
 - Cryptographic operations require thorough validation and error handling

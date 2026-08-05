@@ -1,0 +1,35 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import WorkspaceIsland from "@/islands/WorkspaceIsland";
+import Badge from "@/components/bearnie/badge/Badge.astro";
+import Card from "@/components/bearnie/card/Card.astro";
+import CardContent from "@/components/bearnie/card/CardContent.astro";
+import Kbd from "@/components/bearnie/kbd/Kbd.astro";
+---
+
+<BaseLayout>
+  <WorkspaceIsland client:only="react">
+    <main slot="fallback" class="grid min-h-screen place-items-center bg-background p-4 text-foreground">
+      <Card size="sm" class="w-full max-w-sm shadow-sm" aria-live="polite">
+        <CardContent class="flex items-center gap-3 p-3">
+          <Badge variant="secondary">Local</Badge>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-medium">Opening Card Payment Tools</p>
+            <p class="text-xs text-muted-foreground">Restoring your workspace and local dictionaries…</p>
+          </div>
+          <Kbd>⌘K</Kbd>
+        </CardContent>
+      </Card>
+    </main>
+  </WorkspaceIsland>
+  <noscript>
+    <main class="grid min-h-screen place-items-center bg-background p-6 text-foreground">
+      <section class="max-w-md rounded-lg border bg-card p-4 shadow-sm">
+        <h1 class="text-base font-semibold">Card Payment Tools needs JavaScript</h1>
+        <p class="mt-1 text-sm text-muted-foreground">
+          Parsing and cryptographic tools run locally in your browser. Enable JavaScript to open the workspace.
+        </p>
+      </section>
+    </main>
+  </noscript>
+</BaseLayout>

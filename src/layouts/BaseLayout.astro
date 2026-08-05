@@ -1,0 +1,43 @@
+---
+import "@/index.css";
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = "Card Payment Tools",
+  description = "A compact workspace for EMV, ISO 8583, cryptography and payment-card utilities.",
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="en" data-accent="warm">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+    <script is:inline>
+      (() => {
+        try {
+          const storedTheme = localStorage.getItem("theme");
+          const dark =
+            storedTheme === "dark" ||
+            (storedTheme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.classList.toggle("dark", dark);
+
+          const accent = localStorage.getItem("payment-utilities-accent-theme");
+          if (accent) document.documentElement.dataset.accent = accent;
+        } catch {
+          // The workspace remains usable when storage is unavailable.
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

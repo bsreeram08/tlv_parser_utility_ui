@@ -1,87 +1,88 @@
-# Payment Technology Toolkit
+# Card Payment Tools
 
-A unified platform for payment technology professionals to manage, test, and modify EMV tags and ISO 8583 messages, with cryptographic and encoding utilities.
+A compact, local-first workspace for EMV, ISO 8583, cryptography, PIN blocks, card data, and encoding utilities.
 
----
+## Architecture
+
+- **Astro 7** owns the document, routing, static output, metadata, and global styles.
+- **Bearnie** owns the design-system source under `src/components/bearnie/`, the semantic theme in `src/styles/bearnie.css`, and native Astro UI.
+- **React 19** is limited to the stateful payment-tool workspace through `src/islands/WorkspaceIsland.tsx`.
+- Payment parsers and calculators remain framework-independent TypeScript under `src/utils/` and `src/tools/`.
+- IndexedDB stores saved tests, custom tags, custom bitfields, and workspace state locally.
+
+The single workspace island is intentional: pane order, keyboard focus, drag state, persistence, and command routing form one cohesive client module. New static surfaces should be Astro/Bearnie; new payment logic should stay outside either UI framework. See [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Features
 
-- **TLV (Tag-Length-Value) Parser & Viewer**
+- Parse, inspect, edit, copy, and validate BER-TLV/EMV data.
+- Parse and compose ISO 8583 messages.
+- Compare, save, reopen, and copy TLV payloads; inspect APDUs.
+- Validate EMV configuration and CA public keys.
+- Run payment cryptography, PIN-block, card-number, hash, and conversion tools.
+- Open multiple independent panes, reorder them, use tabs or split mode, zoom, collapse, archive, and restore without discarding mounted tool state.
+- Persist the workspace and user-defined tag decoders locally.
 
-  - Parse, visualize, and validate TLV data (EMV tags)
-  - Save and load test cases with descriptions and tags
-  - Copy results as JSON, view errors, and load examples
-  - Keyboard shortcuts for save/load (Ctrl+S/⌘+S, Ctrl+O/⌘+O)
+## Development
 
-- **ISO 8583 Parser (In Progress)**
+This repository uses Bun as its only package manager.
 
-  - Parse and inspect ISO 8583 financial messages
-  - Modular field registry for easy extension
+```sh
+bun install
+bun run dev
+```
 
-- **Persistent Storage**
+Open [http://localhost:4321](http://localhost:4321).
 
-  - Local IndexedDB (Dexie.js) for saving test cases
-  - Reusable dialogs and drawers for test management
+Verification:
 
-- **Modern UI/UX**
+```sh
+bun run check
+bun run lint
+bun test
+bun run build
+```
 
-  - Built with React, TypeScript, Shadcn/UI, and Tailwind CSS
-  - Responsive, accessible, and themeable (light/dark mode)
+`bun run build` also runs the repository security gate for [GHSA-3p9h-f68w-m6fx](https://github.com/advisories/GHSA-3p9h-f68w-m6fx) and fails if malicious `keyv@6.0.0` appears in the lockfile or installed dependency tree.
 
-- **Extensible Architecture**
-  - Modular utilities for EMV, ISO, cryptography, and card data
-  - Easy to add new tools and features
+## Deployment
 
----
+Firebase Hosting serves the static Astro build from `dist` on the `payment-tlv-utilities` site in project `srbwebapp-73021`.
 
-## Getting Started
+```sh
+bun run build
+firebase deploy --only hosting --project srbwebapp-73021
+```
 
-1. **Install dependencies:**
-   ```sh
-   bun install
-   # or
-   npm install
-   ```
-2. **Run the development server:**
-   ```sh
-   bun run dev
-   # or
-   npm run dev
-   ```
-3. **Open your browser:**
-   Visit [http://localhost:5173](http://localhost:5173) (or as shown in your terminal)
-
----
+Pushes to `master` also build and deploy the same `dist` artifact through the Firebase Hosting workflow.
 
 ## Project Structure
 
-- `src/components/ui/` – UI components (TLV viewer, dialogs, drawers, FAB, etc.)
-- `src/utils/` – Parsing, formatting, and registry utilities for TLV, ISO 8583, etc.
-- `src/types/` – TypeScript types for payment data structures
-- `src/hooks/` – Custom React hooks (e.g., for keyboard shortcuts)
-- `src/utils/db/` – Dexie.js database for persistent storage
-- `memory-bank/` – Project documentation and context (Memory Bank system)
+- `src/pages/` — Astro routes.
+- `src/layouts/` — Astro document and layout modules.
+- `src/components/bearnie/` — Bearnie-owned Astro components.
+- `src/styles/bearnie.css` — Bearnie semantic tokens and elevations.
+- `src/islands/` — explicit client-runtime seams.
+- `src/components/workspace/` — multi-pane React workspace implementation.
+- `src/components/ui/` — React compatibility adapters and payment-tool views.
+- `src/tools/` — tool registry and declarative calculator specifications.
+- `src/utils/` — framework-independent payment-domain logic and browser adapters.
+- `scripts/` — build and security checks.
 
----
+## macOS Shortcuts
 
-## Keyboard Shortcuts
+- `⌘K` — add a tool.
+- `⌘B` — collapse or expand the sidebar.
+- `⌥←` / `⌥→` — previous or next pane.
+- `⌥⇧←` / `⌥⇧→` — move the active pane.
+- `⌥1…9` — focus a pane by number.
+- `⌥↩` — zoom the active pane.
+- `⌥T` — toggle split and tabs.
+- `⌥-` / `⌥=` — collapse or expand the active pane.
+- `⌥D` — duplicate the active pane.
+- `⌥A` — archive the active pane.
+- `⌥W` — close the active pane.
 
-- **Save Test:** Ctrl+S / ⌘+S
-- **Load Test:** Ctrl+O / ⌘+O
+## Documentation
 
----
-
-## Documentation & Memory Bank
-
-Project context, architecture, and progress are documented in the `memory-bank/` directory. See:
-
-- `activeContext.md` – Current focus, recent changes, next steps
-- `progress.md` – What works, what's left, known issues
-- `systemPatterns.md` – Architecture and design patterns
-- `techContext.md` – Technical stack and constraints
-- `productContext.md` – Product rationale and user experience
-- `projectbrief.md` – Core requirements and goals
-
-See the [Memory Bank Guidelines](memory-bank/) for how to add or update documentation.
-
----
+- [ARCHITECTURE.md](ARCHITECTURE.md) — current module seams and migration rules.
+- `memory-bank/` — product context, implementation patterns, and progress notes.

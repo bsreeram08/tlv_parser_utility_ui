@@ -1,8 +1,11 @@
 # Project Progress
 
 ## What Works
-- Project initialization with React + TypeScript + Vite
-- Basic UI setup with Shadcn/UI components 
+- Astro 7 static application shell with one cohesive React 19 workspace island
+- Source-owned Bearnie components and semantic design tokens
+- Lazy-loaded tool registry that avoids eagerly shipping every payment tool
+- Dense, horizontal multi-pane canvas with tabs, zoom, archive, collapse, close, and Mac keyboard controls
+- Build-time protection against the malicious `keyv@6.0.0` release (GHSA-3p9h-f68w-m6fx)
 - Tailwind CSS configuration for styling
 - ESLint and TypeScript configuration
 - TLV test saving and loading using Dexie.js (IndexedDB)
@@ -35,24 +38,30 @@
   - Visual highlighting of added, removed, and modified tags
   - Detailed view of specific value differences
   - Report generation in text format
-  - Integrated with the enhanced storage system for loading saved TLV data
+  - Save, reopen, and delete complete two-sided comparisons in IndexedDB
   - Tab-based interface for easy navigation between different comparison views
 
 ## What's Left to Build
-- Cryptographic operation modules
-- ISO 8583 message builder and parser enhancements
-- Documentation for all utilities
+- Expand reference documentation for individual payment utilities as new tools are added
+- Continue dependency-remediation work for advisories outside the blocked keyv release
 
 ## Current Status
 - **Project Phase:** Feature Implementation
-- **Completion Status:** ~60%
-- **Current Focus:** EMV-123 TLV Parser Enhancements - Phase 4 (TLV Comparison Tool)
+- **Current Focus:** Astro/Bearnie architecture and dense multi-tool workspace UX
+
+## Verification
+- `bun run check` reports zero Astro/TypeScript errors, warnings, or hints.
+- `bun run lint` reports no lint findings.
+- `bun test` runs four executable payment-domain suites covering TLV, EMV, ISO-adjacent utilities, crypto, PIN blocks, converters, custom bitfields, and byte primitives.
+- Browser QA covers workspace restore, pane lifecycle, Mac shortcuts, drag/reorder, themes, reduced motion, dense TLV/ISO output, direct copy actions, and responsive behavior.
 
 ## Known Issues
-- None identified yet, as the project is in initial setup phase
+- A broader dependency audit reports advisories unrelated to the blocked keyv release; these require a separate dependency-remediation pass.
 
 ## Evolution of Project Decisions
-- Selected React with TypeScript as the foundation for type safety
-- Chose Shadcn/UI for accessible component library
+- Selected Astro for document ownership and static output while retaining React only for the cohesive interactive workspace
+- Adopted Bearnie as the source-owned Astro component system
+- Retained existing Radix-backed React components as compatibility adapters during incremental migration
+- Standardized on Bun and one lockfile
 - Decided on memory bank approach for comprehensive documentation
 - Adopted modular architecture for better separation of concerns

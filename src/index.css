@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "./styles/bearnie.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -70,6 +71,9 @@
 
 :root {
   --radius: 0.5rem;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   --background: oklch(0.98 0.01 95.10);
   --foreground: oklch(0.34 0.03 95.72);
   --card: oklch(0.98 0.01 95.10);
@@ -179,6 +183,60 @@
   --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
 }
 
+:root[data-accent="blue"] {
+  --primary: oklch(0.58 0.18 250);
+  --ring: oklch(0.62 0.19 250);
+  --sidebar-primary: oklch(0.58 0.18 250);
+  --chart-1: oklch(0.58 0.18 250);
+}
+
+.dark[data-accent="blue"] {
+  --primary: oklch(0.68 0.16 250);
+  --ring: oklch(0.7 0.15 250);
+  --sidebar-primary: oklch(0.45 0.13 250);
+}
+
+:root[data-accent="green"] {
+  --primary: oklch(0.55 0.15 155);
+  --ring: oklch(0.62 0.15 155);
+  --sidebar-primary: oklch(0.55 0.15 155);
+  --chart-1: oklch(0.55 0.15 155);
+}
+
+.dark[data-accent="green"] {
+  --primary: oklch(0.69 0.14 155);
+  --primary-foreground: oklch(0.2 0.02 155);
+  --ring: oklch(0.7 0.14 155);
+  --sidebar-primary: oklch(0.43 0.11 155);
+}
+
+:root[data-accent="violet"] {
+  --primary: oklch(0.57 0.18 292);
+  --ring: oklch(0.62 0.18 292);
+  --sidebar-primary: oklch(0.57 0.18 292);
+  --chart-1: oklch(0.57 0.18 292);
+}
+
+.dark[data-accent="violet"] {
+  --primary: oklch(0.7 0.16 292);
+  --ring: oklch(0.72 0.15 292);
+  --sidebar-primary: oklch(0.46 0.13 292);
+}
+
+:root[data-accent="mono"] {
+  --primary: oklch(0.38 0 0);
+  --ring: oklch(0.52 0 0);
+  --sidebar-primary: oklch(0.38 0 0);
+  --chart-1: oklch(0.38 0 0);
+}
+
+.dark[data-accent="mono"] {
+  --primary: oklch(0.72 0 0);
+  --primary-foreground: oklch(0.18 0 0);
+  --ring: oklch(0.72 0 0);
+  --sidebar-primary: oklch(0.42 0 0);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -186,5 +244,347 @@
   body {
     @apply bg-background text-foreground;
     letter-spacing: var(--tracking-normal);
+  }
+}
+
+@keyframes utility-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes utility-loader-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes tlv-lint-disclosure-open {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes tlv-lint-disclosure-close {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes tlv-lint-disclosure-open-reduced {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes tlv-lint-disclosure-close-reduced {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@layer components {
+  .ui-button-motion {
+    transition:
+      color 150ms var(--ease-out),
+      background-color 150ms var(--ease-out),
+      border-color 150ms var(--ease-out),
+      box-shadow 150ms var(--ease-out),
+      opacity 100ms var(--ease-out),
+      transform 140ms var(--ease-out);
+  }
+
+  .ui-button-motion:active:not(:disabled):not([aria-disabled="true"]) {
+    transform: scale(0.98);
+  }
+
+  .emv-load-icon {
+    transition:
+      opacity 140ms var(--ease-out),
+      transform 140ms var(--ease-out);
+  }
+
+  .emv-load-icon[data-visible="false"] {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+
+  .emv-load-icon[data-spinning="true"] {
+    animation: utility-loader-spin 700ms linear infinite;
+  }
+
+  .emv-config-result-motion {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    transition:
+      opacity 220ms var(--ease-out),
+      transform 220ms var(--ease-out);
+  }
+
+  .emv-drop-icon {
+    transition:
+      opacity 140ms var(--ease-out),
+      transform 140ms var(--ease-out);
+  }
+
+  .emv-drop-icon[data-dragging="true"] {
+    transform: translateY(-3px) scale(1.03);
+  }
+
+  .emv-drop-label {
+    grid-area: 1 / 1;
+    transition:
+      opacity 120ms var(--ease-out),
+      transform 120ms var(--ease-out);
+  }
+
+  .emv-drop-label[data-visible="false"] {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.97);
+  }
+
+  .tlv-mutation-feedback::after {
+    position: absolute;
+    inset: -1px;
+    border: 2px solid var(--primary);
+    border-radius: inherit;
+    content: "";
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.985);
+    transition:
+      opacity 220ms var(--ease-out),
+      transform 220ms var(--ease-out);
+  }
+
+  .tlv-mutation-feedback[data-highlighted="true"]::after {
+    opacity: 0.68;
+    transform: scale(1);
+    transition-duration: 160ms;
+  }
+
+  .tlv-structural-row {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    transition:
+      opacity 160ms var(--ease-out),
+      transform 160ms var(--ease-out);
+  }
+
+  .tlv-structural-row[data-exiting="true"] {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-3px) scale(0.995);
+    transition-duration: 120ms;
+    transition-timing-function: var(--ease-in-out);
+  }
+
+  .tlv-lint-disclosure[data-state="open"] {
+    animation: tlv-lint-disclosure-open 140ms var(--ease-out) both;
+  }
+
+  .tlv-lint-disclosure[data-state="closed"] {
+    animation: tlv-lint-disclosure-close 100ms var(--ease-in-out) both;
+  }
+
+  .tlv-parse-errors {
+    opacity: 1;
+    transform: translateY(0);
+    transition:
+      opacity 120ms var(--ease-out),
+      transform 120ms var(--ease-out);
+  }
+
+  .tlv-parse-errors[data-exiting="true"] {
+    opacity: 0;
+    transform: translateY(-2px);
+    transition-duration: 90ms;
+    transition-timing-function: var(--ease-in-out);
+  }
+
+  [data-slot="drawer-content"][data-vaul-drawer] {
+    animation-duration: 240ms !important;
+    animation-timing-function: var(--ease-drawer) !important;
+    transition-duration: 240ms !important;
+    transition-timing-function: var(--ease-drawer) !important;
+  }
+
+  [data-slot="drawer-content"][data-vaul-drawer][data-state="closed"] {
+    animation-duration: 160ms !important;
+    transition-duration: 160ms !important;
+  }
+
+  [data-slot="drawer-overlay"][data-vaul-overlay] {
+    animation-duration: 160ms !important;
+    animation-timing-function: var(--ease-out) !important;
+  }
+
+  [data-slot="drawer-overlay"][data-vaul-overlay][data-state="closed"] {
+    animation-duration: 100ms !important;
+  }
+}
+
+@media (pointer: fine) {
+  .tool-panel-drop-target::before {
+    position: absolute;
+    z-index: 10;
+    inset: 0;
+    border: 2px solid var(--primary);
+    border-radius: inherit;
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--primary) 30%, transparent);
+    content: "";
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.995);
+    transition:
+      opacity 90ms var(--ease-out),
+      transform 90ms var(--ease-out);
+  }
+
+  .tool-panel-drop-target[data-drop-target="true"]::before {
+    opacity: 0.7;
+    transform: scale(1);
+    transition-duration: 120ms;
+  }
+}
+
+@starting-style {
+  .emv-config-result-motion {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+
+  .tlv-structural-row[data-structural-entry="true"] {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.995);
+  }
+
+  .tlv-parse-errors {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-button-motion {
+    transition:
+      color 150ms var(--ease-out),
+      background-color 150ms var(--ease-out),
+      border-color 150ms var(--ease-out),
+      box-shadow 150ms var(--ease-out),
+      opacity 100ms var(--ease-out);
+  }
+
+  .ui-button-motion:active:not(:disabled):not([aria-disabled="true"]) {
+    opacity: 0.88;
+    transform: none;
+  }
+
+  .emv-load-icon,
+  .emv-drop-icon,
+  .emv-drop-label {
+    transform: none !important;
+    transition: opacity 120ms var(--ease-out);
+  }
+
+  .emv-load-icon[data-spinning="true"] {
+    animation: utility-loader-pulse 1200ms var(--ease-in-out) infinite;
+  }
+
+  .emv-config-result-motion {
+    transform: none;
+    transition: opacity 160ms var(--ease-out);
+  }
+
+  .tlv-mutation-feedback::after {
+    transform: none;
+    transition: opacity 160ms var(--ease-out);
+  }
+
+  .tlv-mutation-feedback[data-highlighted="true"]::after {
+    transform: none;
+    transition-duration: 160ms;
+  }
+
+  .tlv-structural-row {
+    transform: none;
+    transition: opacity 100ms var(--ease-out);
+  }
+
+  .tlv-structural-row[data-exiting="true"] {
+    transform: none;
+    transition-duration: 100ms;
+    transition-timing-function: var(--ease-in-out);
+  }
+
+  .tlv-lint-disclosure[data-state="open"] {
+    animation: tlv-lint-disclosure-open-reduced 100ms var(--ease-out) both;
+  }
+
+  .tlv-lint-disclosure[data-state="closed"] {
+    animation: tlv-lint-disclosure-close-reduced 100ms var(--ease-in-out) both;
+  }
+
+  .tlv-parse-errors {
+    transform: none;
+    transition: opacity 100ms var(--ease-out);
+  }
+
+  .tlv-parse-errors[data-exiting="true"] {
+    transform: none;
+    transition-duration: 100ms;
+    transition-timing-function: var(--ease-in-out);
+  }
+
+  [data-slot="drawer-content"][data-vaul-drawer] {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  [data-slot="drawer-overlay"][data-vaul-overlay] {
+    animation-duration: 100ms !important;
+  }
+}
+
+@media (pointer: fine) and (prefers-reduced-motion: reduce) {
+  .tool-panel-drop-target::before,
+  .tool-panel-drop-target[data-drop-target="true"]::before {
+    transform: none;
+    transition: opacity 100ms var(--ease-out);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @starting-style {
+    .emv-config-result-motion {
+      opacity: 0;
+      transform: none;
+    }
+
+    .tlv-structural-row[data-structural-entry="true"],
+    .tlv-parse-errors {
+      opacity: 0;
+      transform: none;
+    }
   }
 }

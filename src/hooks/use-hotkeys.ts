@@ -4,6 +4,8 @@ import hotkeys from "hotkeys-js";
 type KeyHandler = (event: KeyboardEvent, handler: { key: string }) => void;
 
 interface HotkeyOptions {
+  /** Bind the shortcut only while this owner is active. */
+  enabled?: boolean;
   /**
    * Enable hotkeys when typing in INPUT, TEXTAREA and SELECT elements
    */
@@ -20,21 +22,25 @@ interface HotkeyOptions {
  * @param keys - The key or keys to bind (e.g., 'ctrl+s', 'command+s', 'shift+r')
  * @param callback - The function to call when the hotkey is pressed
  * @param options - Options for the hotkey binding
- * @param deps - Dependencies to watch for changes (similar to useEffect)
  */
 export function useHotkeys(
   keys: string,
   callback: KeyHandler,
-  options: HotkeyOptions = {},
-  deps: any[] = []
+  options: HotkeyOptions = {}
 ): void {
-  const { enableOnFormTags = false, enableOnContentEditable = false } = options;
+  const {
+    enabled = true,
+    enableOnFormTags = false,
+    enableOnContentEditable = false,
+  } = options;
 
   // Store the callback in a ref to avoid recreating hotkeys bindings on every render
   const callbackRef = useRef<KeyHandler>(callback);
   callbackRef.current = callback;
 
   useEffect(() => {
+    if (!enabled) return;
+
     // Set global hotkeys options
     hotkeys.filter = function (event) {
       const target = event.target as HTMLElement;
@@ -67,5 +73,5 @@ export function useHotkeys(
     return () => {
       hotkeys.unbind(keys);
     };
-  }, [keys, enableOnFormTags, enableOnContentEditable, ...deps]);
+  }, [keys, enabled, enableOnFormTags, enableOnContentEditable]);
 }

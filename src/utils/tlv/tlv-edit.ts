@@ -105,6 +105,111 @@ export function editTlvValue(
   return finalRaw;
 }
 
+/**
+ * Rebuild every ancestor's length field after a child list has been mutated.
+ * `ancestorStack` is outermost-first and must not include the mutated child.
+ */
+function rebuildAncestors(ancestorStack: TlvElement[]): void {
+  for (let i = ancestorStack.length - 1; i >= 0; i--) {
+    const ancestor = ancestorStack[i];
+    const children = ancestor.children || [];
+    const valueHex = children.map((c) => c.rawHex || "").join("");
+    (ancestor as any).rawHex = ancestor.tag + encodeLength(valueHex.length / 2) + valueHex;
+    (ancestor as any).value = valueHex;
+    (ancestor as any).length = valueHex.length / 2;
+  }
+}
+
+/**
+ * Walk a colon-separated tag path, returning the sibling list that holds the
+ * final segment plus the chain of constructed ancestors above it.
+ */
+function resolveContainer(
+  elements: TlvElement[],
+  pathParts: string[]
+): { container: TlvElement[]; ancestors: TlvElement[] } {
+  const ancestors: TlvElement[] = [];
+  let container = elements;
+  for (const tag of pathParts) {
+    const parent = container.find((e) => e.tag === tag);
+    if (!parent) throw new Error(`Path segment not found: ${tag}`);
+    if (!parent.children) {
+      throw new Error(`Tag ${tag} is not a constructed element`);
+    }
+    ancestors.push(parent);
+    container = parent.children;
+  }
+  return { container, ancestors };
+}
+
+/**
+ * Delete the element designated by a colon-separated path of tag IDs.
+ * Ancestor length fields are recalculated. Returns the new full raw hex.
+ */
+export function deleteTlvElement(rawHex: string, path: string): string {
+  const pathParts = path.split(":").filter(Boolean);
+  if (pathParts.length === 0) throw new Error("Empty path");
+
+  const elements = parseTlv(rawHex).elements.map(cloneElementDeep);
+  const targetTag = pathParts[pathParts.length - 1];
+  const { container, ancestors } = resolveContainer(
+    elements,
+    pathParts.slice(0, -1)
+  );
+
+  const index = container.findIndex((e) => e.tag === targetTag);
+  if (index === -1) throw new Error(`Path segment not found: ${targetTag}`);
+  container.splice(index, 1);
+
+  rebuildAncestors(ancestors);
+  return elements.map((e) => e.rawHex).join("");
+}
+
+/**
+ * Insert a new primitive element. `parentPath` is the colon-separated path of
+ * the constructed tag to insert into, or "" / undefined for top level.
+ * Appends to the end of that container. Returns the new full raw hex.
+ */
+export function insertTlvElement(
+  rawHex: string,
+  parentPath: string | undefined,
+  tag: string,
+  valueHex: string
+): string {
+  const normalizedTag = tag.replace(/[^0-9a-fA-F]/g, "").toUpperCase();
+  const normalizedValue = valueHex.replace(/[^0-9a-fA-F]/g, "").toUpperCase();
+
+  if (normalizedTag.length === 0 || normalizedTag.length % 2 !== 0) {
+    throw new Error("Invalid tag (must be even-length hex)");
+  }
+  if (normalizedValue.length % 2 !== 0) {
+    throw new Error("Invalid hex value (must be even length hex)");
+  }
+
+  const elements = parseTlv(rawHex).elements.map(cloneElementDeep);
+  const pathParts = (parentPath || "").split(":").filter(Boolean);
+  const { container, ancestors } = resolveContainer(elements, pathParts);
+
+  if (container.some((e) => e.tag === normalizedTag)) {
+    // Paths address elements by tag, so a duplicate tag in one container would
+    // make the new element unreachable for later edits.
+    throw new Error(
+      `Tag ${normalizedTag} already exists in this container; edit it instead`
+    );
+  }
+
+  const raw = buildPrimitiveRaw(normalizedTag, normalizedValue);
+  container.push({
+    tag: normalizedTag,
+    length: normalizedValue.length / 2,
+    value: normalizedValue,
+    rawHex: raw,
+  });
+
+  rebuildAncestors(ancestors);
+  return elements.map((e) => e.rawHex).join("");
+}
+
 function cloneElementDeep(e: TlvElement): TlvElement {
   const cloned: TlvElement = {
     tag: e.tag,

@@ -1,21 +1,32 @@
-import type { JSX, ReactNode } from "react";
+import { useEffect, useMemo, useState, type JSX, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import {
-  CreditCard,
-  FileCode,
-  KeyRound,
-  Settings,
-  Menu,
-  Tag,
+  ArrowLeftRight,
+  BadgeCheck,
+  Binary,
+  Blocks,
+  BookOpen,
   ChevronDown,
+  CreditCard,
+  Hammer,
+  Hash,
+  KeyRound,
+  LockKeyhole,
+  Menu,
   PanelLeftClose,
   PanelLeftOpen,
-  GitCompare,
+  ScanLine,
+  Search,
+  ShieldCheck,
+  Tags,
+  Wrench,
+  X,
+  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Toaster } from "@/components/ui/sonner";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { useState, useEffect } from "react";
+import { CommandPalette } from "@/components/ui/command-palette";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
   Collapsible,
@@ -28,81 +39,122 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
-// Define the available modules
-type ActiveModule =
-  | "tlv"
-  | "iso8583"
-  | "crypto"
-  | "settings"
-  | "custom-tags"
-  | "tlv-comparison";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { groupedTools, searchTools } from "@/tools/registry";
 
 interface MainLayoutProps {
   children: ReactNode;
-  activeModule: ActiveModule;
-  onNavigate: (module: ActiveModule) => void;
+  activeToolId: string;
+  openToolIds: string[];
+  onNavigate: (toolId: string) => void;
+}
+
+const GROUP_ICONS: Record<string, LucideIcon> = {
+  EMV: CreditCard,
+  "EMV tag decoders": Tags,
+  "ISO 8583": Binary,
+  Ciphers: LockKeyhole,
+  Hashes: Hash,
+  "PIN blocks": Blocks,
+  "PIN verification": BadgeCheck,
+  "Card security values": ShieldCheck,
+  "Card numbers": ScanLine,
+  Converters: ArrowLeftRight,
+  Build: Hammer,
+  Reference: BookOpen,
+};
+
+function groupIcon(group: string): LucideIcon {
+  return GROUP_ICONS[group] ?? KeyRound;
 }
 
 export function MainLayout({
   children,
-  activeModule,
+  activeToolId,
+  openToolIds,
   onNavigate,
 }: MainLayoutProps): JSX.Element {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("payment-utilities-sidebar-collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
   const [isMobile, setIsMobile] = useState(false);
   const [open, setOpen] = useState(false);
 
-  // Check if we're on mobile
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024);
-    };
-
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Get module title
-  const getModuleTitle = () => {
-    switch (activeModule) {
-      case "tlv":
-        return "TLV Parser";
-      case "custom-tags":
-        return "Custom Tag Management";
-      case "tlv-comparison":
-        return "TLV Comparison Tool";
-      case "iso8583":
-        return "ISO 8583 Message Parser";
-      case "crypto":
-        return "Cryptography Tools";
-      case "settings":
-        return "Settings";
-      default:
-        return "Payment Utilities";
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "payment-utilities-sidebar-collapsed",
+        String(sidebarCollapsed)
+      );
+    } catch {
+      // Persistence is optional.
     }
-  };
+  }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const isEditing =
+        target?.matches("input, textarea, select") || target?.isContentEditable;
+
+      if (event.key.toLowerCase() === "b" && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        setSidebarCollapsed((current) => !current);
+        return;
+      }
+
+      if (isEditing || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key === "[") {
+        event.preventDefault();
+        setSidebarCollapsed(true);
+      } else if (event.key === "]") {
+        event.preventDefault();
+        setSidebarCollapsed(false);
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   return (
-    <div className="min-h-screen flex bg-background">
+    <div className="flex h-screen overflow-hidden bg-background">
       {isMobile ? (
-        /* Mobile sidebar using Sheet component */
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
             <Button
               variant="outline"
               size="icon"
-              className="fixed top-4 left-4 z-50 lg:hidden"
+              className="fixed left-2 top-2 z-50 md:hidden"
+              aria-label="Open navigation"
             >
               <Menu className="h-4 w-4" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-64">
+          <SheetContent side="left" className="w-72 overflow-y-auto p-0">
             <SidebarContent
-              activeModule={activeModule}
-              onNavigate={(module) => {
-                onNavigate(module);
+              activeToolId={activeToolId}
+              openToolIds={openToolIds}
+              onNavigate={(id) => {
+                onNavigate(id);
                 setOpen(false);
               }}
               collapsed={false}
@@ -110,192 +162,320 @@ export function MainLayout({
           </SheetContent>
         </Sheet>
       ) : (
-        /* Desktop sidebar */
         <aside
           className={cn(
-            "h-screen sticky top-0 border-r z-40 transition-all duration-300 ease-in-out bg-background",
-            sidebarCollapsed ? "w-16" : "w-64"
+            "sticky top-0 z-40 flex h-screen shrink-0 flex-col border-r bg-background transition-[width] duration-[220ms] ease-[var(--ease-out)]",
+            sidebarCollapsed ? "w-12" : "w-72"
           )}
         >
-          <SidebarContent
-            activeModule={activeModule}
-            onNavigate={onNavigate}
-            collapsed={sidebarCollapsed}
-          />
+          <div className="flex-1 overflow-y-auto">
+            <SidebarContent
+              activeToolId={activeToolId}
+              openToolIds={openToolIds}
+              onNavigate={onNavigate}
+              collapsed={sidebarCollapsed}
+            />
+          </div>
 
-          {/* Collapse toggle button integrated into sidebar */}
-          <Button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            variant="ghost"
-            size="icon"
-            className="absolute bottom-4 right-4"
-            aria-label={
-              sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"
-            }
-          >
-            {sidebarCollapsed ? (
-              <PanelLeftOpen className="h-4 w-4" />
-            ) : (
-              <PanelLeftClose className="h-4 w-4" />
+          <div
+            className={cn(
+              "flex border-t p-1.5",
+              sidebarCollapsed ? "justify-center" : "justify-end"
             )}
-          </Button>
+          >
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                  variant="ghost"
+                  size="icon"
+                  aria-keyshortcuts="Meta+B Control+B BracketLeft BracketRight"
+                  aria-label={
+                    sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"
+                  }
+                >
+                  {sidebarCollapsed ? (
+                    <PanelLeftOpen className="h-4 w-4" />
+                  ) : (
+                    <PanelLeftClose className="h-4 w-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                {sidebarCollapsed ? "Expand sidebar · ] or ⌘B" : "Collapse sidebar · [ or ⌘B"}
+              </TooltipContent>
+            </Tooltip>
+          </div>
         </aside>
       )}
 
-      {/* Main content area */}
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <header className="h-16 border-b sticky top-0 bg-background z-30 flex items-center px-4 lg:px-6">
-          <div className="w-full flex justify-between items-center">
-            {/* Title aligned to left with space for mobile menu button */}
-            <h1 className="font-semibold text-lg ml-10 lg:ml-0">
-              {getModuleTitle()}
-            </h1>
-
-            <div className="flex items-center space-x-3">
-              <Button variant="outline" size="sm">
-                Documentation
-              </Button>
-              <ThemeToggle />
-            </div>
-          </div>
-        </header>
-
-        {/* Content */}
-        <main className="flex-1 p-6">{children}</main>
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <main className="min-h-0 flex-1 overflow-auto p-2 sm:p-3">{children}</main>
       </div>
 
-      {/* Toast notifications */}
-      <Toaster position="top-right" />
+      <CommandPalette onSelect={onNavigate} />
+      <Toaster position="bottom-right" visibleToasts={1} />
     </div>
   );
 }
 
-// Extracted Sidebar Content component
 function SidebarContent({
-  activeModule,
+  activeToolId,
+  openToolIds,
   onNavigate,
   collapsed,
 }: {
-  activeModule: ActiveModule;
-  onNavigate: (module: ActiveModule) => void;
+  activeToolId: string;
+  openToolIds: string[];
+  onNavigate: (toolId: string) => void;
   collapsed: boolean;
 }) {
+  const [query, setQuery] = useState("");
+  const groups = useMemo(() => groupedTools(), []);
+
+  // While searching, show one flat result list — group headings get in the way
+  // when you already know what you are looking for.
+  const matches = useMemo(
+    () => (query.trim() ? searchTools(query) : null),
+    [query]
+  );
+  const openCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const toolId of openToolIds) {
+      counts.set(toolId, (counts.get(toolId) ?? 0) + 1);
+    }
+    return counts;
+  }, [openToolIds]);
+
   return (
-    <div className={cn("p-4 py-6 h-full flex flex-col", collapsed && "px-2")}>
+    <div className={cn("flex h-full flex-col p-2", collapsed && "px-1.5")}>
       <h2
         className={cn(
-          "font-semibold text-xl mb-6",
-          collapsed && "text-center text-base mb-4"
+          "flex h-8 items-center font-semibold",
+          collapsed ? "mb-1 justify-center" : "mb-2 gap-2 px-1 text-sm"
         )}
       >
-        {collapsed ? "Menu" : "Payment Utilities"}
+        {collapsed ? (
+          <TooltipProvider delayDuration={120}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Wrench className="size-4" aria-label="Card Payment Tools" />
+              </TooltipTrigger>
+              <TooltipContent side="right">Card Payment Tools</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ) : (
+          <>
+            <Wrench className="size-4 text-primary" />
+            Card payment tools
+          </>
+        )}
       </h2>
 
-      <nav className="space-y-2 flex-1">
-        <Collapsible defaultOpen className="group">
-          <CollapsibleTrigger
-            className={cn(
-              "flex items-center w-full rounded-md p-2",
-              "text-muted-foreground hover:text-foreground hover:bg-muted",
-              "transition-all duration-200",
-              collapsed ? "justify-center" : "justify-between"
-            )}
-          >
-            {!collapsed && <span>TLV Utilities</span>}
-            <ChevronDown
-              className={cn(
-                "h-4 w-4 transition-transform group-data-[state=open]:rotate-180",
-                collapsed ? "mx-auto" : "ml-auto"
-              )}
-            />
-          </CollapsibleTrigger>
+      {!collapsed && (
+        <div className="relative mb-2">
+          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Filter tools"
+            aria-label="Filter tools"
+            className="h-7 pl-8 pr-8 text-xs"
+          />
+          {query && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Clear filter"
+              className="absolute right-0.5 top-1/2 h-7 w-7 -translate-y-1/2"
+              onClick={() => setQuery("")}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
+      )}
 
-          <CollapsibleContent className="mt-1 space-y-1">
-            <SidebarItem
-              icon={<FileCode size={18} />}
-              current={activeModule === "tlv"}
-              onClick={() => onNavigate("tlv")}
-              collapsed={collapsed}
-            >
-              TLV Parser
-            </SidebarItem>
-            <SidebarItem
-              icon={<Tag size={18} />}
-              current={activeModule === "custom-tags"}
-              onClick={() => onNavigate("custom-tags")}
-              collapsed={collapsed}
-            >
-              Custom Tags
-            </SidebarItem>
-            <SidebarItem
-              icon={<GitCompare size={18} />}
-              current={activeModule === "tlv-comparison"}
-              onClick={() => onNavigate("tlv-comparison")}
-              collapsed={collapsed}
-            >
-              TLV Compare
-            </SidebarItem>
-          </CollapsibleContent>
-        </Collapsible>
+      <nav className="min-h-0 flex-1 space-y-0.5">
+        {matches ? (
+          matches.length === 0 ? (
+            <p className="px-2 py-4 text-xs text-muted-foreground">
+              Nothing matches “{query.trim()}”.
+            </p>
+          ) : (
+            matches.map((tool) => (
+              <SidebarItem
+                key={tool.id}
+                current={tool.id === activeToolId}
+                count={openCounts.get(tool.id)}
+                onClick={() => onNavigate(tool.id)}
+                collapsed={collapsed}
+                subtitle={tool.group}
+              >
+                {tool.name}
+              </SidebarItem>
+            ))
+          )
+        ) : collapsed ? (
+          <TooltipProvider delayDuration={120}>
+            <div className="flex flex-col items-center gap-0.5">
+              {groups.map(({ group, tools }) => {
+                const Icon = groupIcon(group);
+                const groupIsActive = tools.some((tool) =>
+                  openCounts.has(tool.id)
+                );
 
-        <SidebarItem
-          icon={<CreditCard size={18} />}
-          current={activeModule === "iso8583"}
-          onClick={() => onNavigate("iso8583")}
-          collapsed={collapsed}
-        >
-          ISO 8583
-        </SidebarItem>
-        <SidebarItem
-          icon={<KeyRound size={18} />}
-          current={activeModule === "crypto"}
-          onClick={() => onNavigate("crypto")}
-          collapsed={collapsed}
-        >
-          Crypto Utils
-        </SidebarItem>
-        <SidebarItem
-          icon={<Settings size={18} />}
-          current={activeModule === "settings"}
-          onClick={() => onNavigate("settings")}
-          collapsed={collapsed}
-        >
-          Settings
-        </SidebarItem>
+                return (
+                  <DropdownMenu key={group}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            aria-label={group}
+                            aria-current={groupIsActive ? "page" : undefined}
+                            className={cn(
+                              "flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
+                              groupIsActive &&
+                                "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+                            )}
+                          >
+                            <Icon className="size-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">{group}</TooltipContent>
+                    </Tooltip>
+                    <DropdownMenuContent side="right" align="start" className="w-56">
+                      <DropdownMenuLabel className="py-1 text-xs text-muted-foreground">
+                        {group}
+                      </DropdownMenuLabel>
+                      {tools.map((tool) => (
+                        <DropdownMenuItem
+                          key={tool.id}
+                          onSelect={() => onNavigate(tool.id)}
+                          className={cn(
+                            "py-1 text-xs",
+                            openCounts.has(tool.id) && "bg-accent font-medium"
+                          )}
+                        >
+                          <span className="min-w-0 flex-1 whitespace-normal leading-tight">
+                            {tool.name}
+                          </span>
+                          {(openCounts.get(tool.id) ?? 0) > 0 && (
+                            <Badge variant="secondary" className="h-4 px-1 text-[9px]">
+                              {openCounts.get(tool.id)}
+                            </Badge>
+                          )}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                );
+              })}
+            </div>
+          </TooltipProvider>
+        ) : (
+          groups.map(({ group, tools }) => (
+            <Collapsible
+              key={group}
+              defaultOpen={tools.some((t) => t.id === activeToolId)}
+              className="group"
+            >
+              <CollapsibleTrigger
+                className={cn(
+                  "flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] font-medium uppercase tracking-wide",
+                  "text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                  collapsed ? "justify-center" : "justify-between"
+                )}
+              >
+                {(() => {
+                  const Icon = groupIcon(group);
+                  return <Icon className="size-3.5 shrink-0" />;
+                })()}
+                {!collapsed && <span className="truncate">{group}</span>}
+                <ChevronDown
+                  className={cn(
+                    "h-3.5 w-3.5 flex-shrink-0 transition-transform group-data-[state=open]:rotate-180",
+                    collapsed ? "mx-auto" : "ml-auto"
+                  )}
+                />
+              </CollapsibleTrigger>
+
+              <CollapsibleContent className="space-y-px pl-1">
+                {tools.map((tool) => (
+                  <SidebarItem
+                    key={tool.id}
+                    current={tool.id === activeToolId}
+                    count={openCounts.get(tool.id)}
+                    onClick={() => onNavigate(tool.id)}
+                    collapsed={collapsed}
+                    tooltip={tool.name}
+                  >
+                    {tool.name}
+                  </SidebarItem>
+                ))}
+              </CollapsibleContent>
+            </Collapsible>
+          ))
+        )}
       </nav>
     </div>
   );
 }
 
-// Modified SidebarItem with Tooltip for collapsed state
 function SidebarItem({
   children,
-  icon,
   current = false,
   onClick,
   collapsed = false,
+  subtitle,
+  tooltip,
+  count,
 }: {
   children: ReactNode;
-  icon: ReactNode;
   current?: boolean;
   onClick: () => void;
   collapsed?: boolean;
+  subtitle?: string;
+  tooltip?: string;
+  count?: number;
 }): JSX.Element {
   const button = (
     <button
       onClick={onClick}
+      aria-current={current ? "page" : undefined}
       className={cn(
-        "flex items-center rounded-md text-sm w-full",
-        collapsed ? "justify-center py-2 px-2" : "text-left py-2 px-3",
-        "transition-all duration-200",
+        "w-full rounded-md text-sm transition-colors",
+        collapsed ? "px-1 py-1 text-center text-[10px]" : "px-2 py-1 text-left text-xs",
         current
           ? "bg-primary text-primary-foreground"
           : "text-muted-foreground hover:bg-muted hover:text-foreground"
       )}
     >
-      <span className={cn("flex-shrink-0", !collapsed && "mr-2")}>{icon}</span>
-      {!collapsed && <span className="truncate">{children}</span>}
+      <span className="flex items-start gap-1.5">
+        <span className="min-w-0 flex-1 whitespace-normal break-words leading-snug">
+          {children}
+        </span>
+        {count !== undefined && count > 0 && !collapsed && (
+          <Badge
+            variant={current ? "outline" : "secondary"}
+            className="mt-px h-4 shrink-0 px-1 text-[9px]"
+          >
+            {count}
+          </Badge>
+        )}
+      </span>
+      {subtitle && !collapsed && (
+        <span
+          className={cn(
+            "block truncate text-[10px]",
+            current ? "text-primary-foreground/70" : "text-muted-foreground/70"
+          )}
+        >
+          {subtitle}
+        </span>
+      )}
     </button>
   );
 
@@ -304,7 +484,7 @@ function SidebarItem({
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>{button}</TooltipTrigger>
-          <TooltipContent side="right">{children}</TooltipContent>
+          <TooltipContent side="right">{tooltip ?? children}</TooltipContent>
         </Tooltip>
       </TooltipProvider>
     );

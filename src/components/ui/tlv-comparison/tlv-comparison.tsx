@@ -4,7 +4,7 @@
  * A component that provides side-by-side comparison of two TLV data streams
  */
 
-import { useState, useEffect, type JSX } from "react";
+import { useState, useEffect, useId, type JSX } from "react";
 
 // Define TLV format type
 type TlvFormat = "hex" | "base64" | "unknown";
@@ -27,12 +27,23 @@ import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeftRight,
   Copy,
+  FolderOpen,
   Save,
   RefreshCw,
-  ArrowUpFromLine,
+  Trash2,
 } from "lucide-react";
 import { CompactTlvDisplay } from "../tlv-viewer/compact-tlv-display";
 import { tlvValueToAscii } from "@/utils/tlv";
+import { SaveDialog } from "@/components/ui/save-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { db } from "@/utils/db/db";
+import type { SavedTlvComparison } from "@/types/tlv-comparison";
 import {
   Tooltip,
   TooltipContent,
@@ -48,6 +59,9 @@ const RIGHT_EXAMPLE_TLV_DATA =
   "9F2608A1B2C3D4E5F6A7B89F2701019F360200039F10120110A0000F040000000000000000000000FF9F3303E0F0C89505008004E000";
 
 export function TlvComparison(): JSX.Element {
+  const showUnknownId = useId();
+  const expandAllId = useId();
+  const tableViewId = useId();
   // State for left side
   const [leftParseResult, setLeftParseResult] =
     useState<TlvParsingResult | null>(null);
@@ -67,6 +81,11 @@ export function TlvComparison(): JSX.Element {
   const [showUnknownTags, setShowUnknownTags] = useState(true);
   const [expandAll, setExpandAll] = useState(false);
   const [viewMode, setViewMode] = useState<"side-by-side" | "table">("table");
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [savedDialogOpen, setSavedDialogOpen] = useState(false);
+  const [savedComparisons, setSavedComparisons] = useState<
+    SavedTlvComparison[]
+  >([]);
 
   /**
    * Check if a string is a non-empty string
@@ -267,6 +286,7 @@ export function TlvComparison(): JSX.Element {
     setRightFormat("hex");
     handleLeftParse({ value: LEFT_EXAMPLE_TLV_DATA, format: "hex" });
     handleRightParse({ value: RIGHT_EXAMPLE_TLV_DATA, format: "hex" });
+    setActiveTab("results");
   };
 
   /**
@@ -360,6 +380,97 @@ export function TlvComparison(): JSX.Element {
 
   const syncedPairs = createSyncedComparison();
 
+  const refreshBoth = (): void => {
+    if (leftParseResult) {
+      handleLeftParse({ value: leftInputHex, format: leftFormat });
+    }
+    if (rightParseResult) {
+      handleRightParse({ value: rightInputHex, format: rightFormat });
+    }
+  };
+
+  const copyComparison = async (): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(
+        JSON.stringify(
+          {
+            left: leftParseResult
+              ? formatTlvAsJson(leftParseResult)
+              : null,
+            right: rightParseResult
+              ? formatTlvAsJson(rightParseResult)
+              : null,
+          },
+          null,
+          2
+        )
+      );
+      toast.success("Comparison copied as JSON");
+    } catch {
+      toast.error("Could not copy the comparison");
+    }
+  };
+
+  const saveComparison = async (
+    name: string,
+    description: string,
+    tags: string[]
+  ): Promise<void> => {
+    if (!leftParseResult || !rightParseResult) {
+      throw new Error("Parse both TLV values before saving");
+    }
+
+    await db.saveTlvComparison({
+      name,
+      description,
+      leftData: leftInputHex,
+      rightData: rightInputHex,
+      leftName,
+      rightName,
+      date: new Date(),
+      tags,
+      source: "TLV comparison",
+      lastAccessed: new Date(),
+      options: { showUnknownTags, expandAll, viewMode },
+    });
+  };
+
+  const openSavedComparisons = async (): Promise<void> => {
+    setSavedComparisons(await db.getTlvComparisons());
+    setSavedDialogOpen(true);
+  };
+
+  const loadComparison = async (
+    comparison: SavedTlvComparison
+  ): Promise<void> => {
+    const loadedLeftFormat = detectFormat(comparison.leftData);
+    const loadedRightFormat = detectFormat(comparison.rightData);
+
+    setLeftName(comparison.leftName);
+    setRightName(comparison.rightName);
+    handleLeftParse({ value: comparison.leftData, format: loadedLeftFormat });
+    handleRightParse({
+      value: comparison.rightData,
+      format: loadedRightFormat,
+    });
+    setActiveTab("results");
+    setSavedDialogOpen(false);
+
+    if (comparison.id !== undefined) {
+      await db.updateTlvComparisonAccess(comparison.id);
+    }
+    toast.success(`Loaded ${comparison.name}`);
+  };
+
+  const deleteComparison = async (comparison: SavedTlvComparison) => {
+    if (comparison.id === undefined) return;
+    await db.deleteTlvComparison(comparison.id);
+    setSavedComparisons((current) =>
+      current.filter((item) => item.id !== comparison.id)
+    );
+    toast.success(`Deleted ${comparison.name}`);
+  };
+
   // Re-parse when custom tag registry updates so names & metadata refresh
   useEffect(() => {
     const listener = () => {
@@ -406,12 +517,12 @@ export function TlvComparison(): JSX.Element {
               <div className="flex flex-wrap items-center gap-4">
                 <div className="flex items-center space-x-2">
                   <Switch
-                    id="show-unknown-tags"
+                    id={showUnknownId}
                     checked={showUnknownTags}
                     onCheckedChange={setShowUnknownTags}
                   />
                   <Label
-                    htmlFor="show-unknown-tags"
+                    htmlFor={showUnknownId}
                     className="text-sm whitespace-nowrap"
                   >
                     Show unknown
@@ -420,12 +531,12 @@ export function TlvComparison(): JSX.Element {
 
                 <div className="flex items-center space-x-2">
                   <Switch
-                    id="expand-all"
+                    id={expandAllId}
                     checked={expandAll}
                     onCheckedChange={setExpandAll}
                   />
                   <Label
-                    htmlFor="expand-all"
+                    htmlFor={expandAllId}
                     className="text-sm whitespace-nowrap"
                   >
                     Expand all
@@ -434,7 +545,7 @@ export function TlvComparison(): JSX.Element {
 
                 <div className="flex items-center space-x-2">
                   <Switch
-                    id="table-view"
+                    id={tableViewId}
                     checked={viewMode === "table"}
                     onCheckedChange={(checked) =>
                       setViewMode(checked ? "table" : "side-by-side")
@@ -444,7 +555,7 @@ export function TlvComparison(): JSX.Element {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Label
-                          htmlFor="table-view"
+                          htmlFor={tableViewId}
                           className="text-sm whitespace-nowrap cursor-help"
                         >
                           Table view
@@ -476,6 +587,45 @@ export function TlvComparison(): JSX.Element {
                     onClick={handleLoadExamples}
                   >
                     Load Examples
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={refreshBoth}
+                    disabled={!leftParseResult && !rightParseResult}
+                    title="Refresh parsed values"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Refresh
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={copyComparison}
+                    disabled={!leftParseResult && !rightParseResult}
+                    title="Copy both parsed values as JSON"
+                  >
+                    <Copy className="h-4 w-4" />
+                    Copy JSON
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={openSavedComparisons}
+                    title="Open a saved comparison"
+                  >
+                    <FolderOpen className="h-4 w-4" />
+                    Open
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSaveDialogOpen(true)}
+                    disabled={!leftParseResult || !rightParseResult}
+                    title="Save this comparison"
+                  >
+                    <Save className="h-4 w-4" />
+                    Save
                   </Button>
                 </div>
               </div>
@@ -534,9 +684,10 @@ export function TlvComparison(): JSX.Element {
               <div className="flex justify-center mt-4">
                 <Button
                   onClick={() => {
-                    // Parse both TLV inputs simultaneously
+                    const leftDetectedFormat = detectFormat(leftInputHex);
+                    const rightDetectedFormat = detectFormat(rightInputHex);
+
                     if (leftInputHex) {
-                      const leftDetectedFormat = detectFormat(leftInputHex);
                       if (leftDetectedFormat !== "unknown") {
                         handleLeftParse({
                           value: leftInputHex,
@@ -548,7 +699,6 @@ export function TlvComparison(): JSX.Element {
                     }
 
                     if (rightInputHex) {
-                      const rightDetectedFormat = detectFormat(rightInputHex);
                       if (rightDetectedFormat !== "unknown") {
                         handleRightParse({
                           value: rightInputHex,
@@ -557,6 +707,13 @@ export function TlvComparison(): JSX.Element {
                       } else {
                         toast.error("Invalid format detected in Target TLV");
                       }
+                    }
+
+                    if (
+                      leftDetectedFormat !== "unknown" &&
+                      rightDetectedFormat !== "unknown"
+                    ) {
+                      setActiveTab("results");
                     }
                   }}
                   className="px-8"
@@ -737,81 +894,61 @@ export function TlvComparison(): JSX.Element {
         </CardContent>
       </Card>
 
-      {/* Floating Action Buttons */}
-      <div className="fixed bottom-4 right-4 flex flex-col space-y-2">
-        <Button
-          variant="default"
-          size="icon"
-          className="rounded-full"
-          onClick={handleLoadExamples}
-          title="Load Example Data"
-        >
-          <ArrowUpFromLine className="h-4 w-4" />
-        </Button>
+      <SaveDialog
+        isOpen={saveDialogOpen}
+        onClose={() => setSaveDialogOpen(false)}
+        onSave={saveComparison}
+        title="Save TLV Comparison"
+        description="Keep both values together so you can reopen this comparison later."
+      />
 
-        <Button
-          variant="default"
-          size="icon"
-          className="rounded-full"
-          onClick={() => {
-            if (leftParseResult)
-              handleLeftParse({ value: leftInputHex, format: leftFormat });
-            if (rightParseResult)
-              handleRightParse({ value: rightInputHex, format: rightFormat });
-          }}
-          title="Refresh Both"
-        >
-          <RefreshCw className="h-4 w-4" />
-        </Button>
-
-        <Button
-          variant="default"
-          size="icon"
-          className="rounded-full"
-          onClick={() => {
-            // Save comparison functionality would go here
-            toast.info("Save feature coming soon");
-          }}
-          title="Save Comparison"
-        >
-          <Save className="h-4 w-4" />
-        </Button>
-
-        <Button
-          variant="default"
-          size="icon"
-          className="rounded-full"
-          onClick={() => {
-            // Copy comparison results functionality would go here
-            navigator.clipboard.writeText(
-              JSON.stringify(
-                {
-                  left: leftParseResult
-                    ? formatTlvAsJson({
-                        elements: leftParseResult.elements,
-                        errors: leftParseResult.errors,
-                        rawHex: leftParseResult.rawHex,
-                      })
-                    : null,
-                  right: rightParseResult
-                    ? formatTlvAsJson({
-                        elements: rightParseResult.elements,
-                        errors: rightParseResult.errors,
-                        rawHex: rightParseResult.rawHex,
-                      })
-                    : null,
-                },
-                null,
-                2
-              )
-            );
-            toast.success("Comparison copied to clipboard as JSON");
-          }}
-          title="Copy as JSON"
-        >
-          <Copy className="h-4 w-4" />
-        </Button>
-      </div>
+      <Dialog open={savedDialogOpen} onOpenChange={setSavedDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Saved comparisons</DialogTitle>
+            <DialogDescription>
+              Reopen both TLV values in this pane.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] space-y-1 overflow-y-auto pr-1">
+            {savedComparisons.length === 0 ? (
+              <p className="rounded-md border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
+                No saved comparisons yet.
+              </p>
+            ) : (
+              savedComparisons.map((comparison) => (
+                <div
+                  key={comparison.id}
+                  className="flex items-center gap-2 rounded-md border px-3 py-2"
+                >
+                  <button
+                    type="button"
+                    className="min-w-0 flex-1 text-left"
+                    onClick={() => loadComparison(comparison)}
+                  >
+                    <span className="block truncate text-sm font-medium">
+                      {comparison.name}
+                    </span>
+                    <span className="block truncate font-mono text-xs text-muted-foreground">
+                      {comparison.leftData} ↔ {comparison.rightData}
+                    </span>
+                  </button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8"
+                    onClick={() => deleteComparison(comparison)}
+                    aria-label={`Delete ${comparison.name}`}
+                    title={`Delete ${comparison.name}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

@@ -5,16 +5,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Commands
 
 ### Package Management
-- Use `bun install` or `npm install` for dependencies
-- Use `bun` or `npm` for running scripts
+- Use Bun for dependency management and scripts. `bun.lock` is the only lockfile.
 
 ### Development Server
-- `bun run dev` or `npm run dev` - Start development server (runs on http://localhost:5173)
-- `bun run preview` or `npm run preview` - Preview production build
+- `bun run dev` - Start the Astro development server (defaults to http://localhost:4321)
+- `bun run preview` - Preview the static production build
 
 ### Build & Quality
-- `bun run build` or `npm run build` - Build for production (TypeScript compilation + Vite build)
-- `bun run lint` or `npm run lint` - Run ESLint for code quality
+- `bun run check` - Run Astro and TypeScript checks
+- `bun run build` - Run the keyv advisory gate, Astro checks, and the static production build
+- `bun run lint` - Run ESLint for code quality
+- `bun run test` - Run executable payment-domain test suites
+- `bun run security:advisories` - Reject the malicious `keyv@6.0.0` release
+- `firebase deploy --only hosting --project srbwebapp-73021` - Deploy the verified `dist` build to Firebase Hosting
 
 ## Project Architecture
 
@@ -26,35 +29,43 @@ This is a payment technology toolkit with several distinct modules:
    - Save/load test cases with persistent storage
    - Custom tag definitions and registry
 
-2. **ISO 8583 Parser** - In development
+2. **ISO 8583 Tools**
    - Parse financial messages
    - Modular field registry system
 
-3. **Cryptographic Utilities** - Planned
-4. **Settings Management** - Planned
+3. **Cryptographic and PIN Utilities**
+4. **Workspace Appearance and Persistence**
 
 ### Key Directories
 
 #### `/src/components/`
+- `bearnie/` - Source-owned Bearnie Astro components; use these for new static UI
 - `ui/tlv-viewer/` - Main TLV parsing and display components
 - `ui/iso-builder/` - ISO 8583 message tools
 - `ui/custom-tags/` - Custom tag management
 - `ui/tlv-comparison/` - TLV comparison tools
-- `layouts/` - Application layout components
+
+#### Astro application shell
+- `pages/index.astro` - Static route and native Bearnie loading fallback
+- `layouts/BaseLayout.astro` - Document metadata, global styles, and pre-hydration theme setup
+- `islands/WorkspaceIsland.tsx` - The single interactive React workspace boundary
+- `tools/registry.ts` - Lazy-loaded tool catalog
 
 #### `/src/utils/`
 - `tlv/` - TLV parsing, formatting, and tag registry
 - `iso8583/` - ISO 8583 parsing and field definitions
 - `db/` - Dexie.js database for persistent storage
-- `crypto/` - Cryptographic utilities (planned)
+- `crypto/` - Cryptographic and PIN-block utilities
 
 #### `/src/types/`
 - Type definitions for TLV, ISO 8583, and custom tags
 - Follows EMV specifications for data structures
 
 ### Technical Stack
-- **Frontend**: React 19 + TypeScript + Vite
-- **UI**: Shadcn/UI components + Tailwind CSS
+- **Application shell**: Astro 7 with static output
+- **Interactive workspace**: One React 19 island with lazy-loaded tool views
+- **UI**: Source-owned Bearnie Astro components and semantic Bearnie tokens
+- **Compatibility layer**: Existing Radix-backed React primitives under `src/components/ui/`
 - **State**: Jotai for state management
 - **Storage**: Dexie.js (IndexedDB wrapper)
 - **Styling**: Tailwind CSS v4 with theme support
@@ -106,7 +117,8 @@ Uses Dexie.js with multiple tables:
 
 ### Component Structure
 - Components follow consistent patterns with TypeScript interfaces
-- Use Shadcn/UI components as base building blocks
+- Use Bearnie components for new Astro UI and Bearnie semantic tokens throughout
+- Treat `src/components/ui/` as a React-island compatibility layer, not as shadcn-owned generated code
 - Props are typed with clear interfaces
 - Error boundaries for graceful error handling
 
@@ -140,9 +152,11 @@ The project uses a comprehensive documentation system in `/memory-bank/`:
 ### ESLint Configuration
 - TypeScript ESLint with React plugins
 - Relaxed rules for `@typescript-eslint/no-explicit-any` and `@typescript-eslint/no-unused-vars`
-- React hooks and refresh plugins enabled
+- React Hooks rules enabled; Astro owns the application build pipeline
 
-### Vite Configuration
-- React plugin with Tailwind CSS
-- Path aliases configured for `@/src`
-- Development server with hot reload
+### Astro Configuration
+- React integration hydrates only `WorkspaceIsland`
+- Tailwind CSS is connected through the Astro Vite pipeline
+- Static output is the default deployment target
+- Path alias `@` resolves to `/src`
+- Heavy tool views must stay lazy-loaded through `src/tools/registry.ts`
