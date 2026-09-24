@@ -32,41 +32,42 @@ export const APPLICATION_INTERCHANGE_PROFILE = {
 };
 
 // AIP bit specifications based on EMV specifications
-const AIP_CAPABILITIES = {
+export const AIP_CAPABILITIES = {
   byte1: {
     name: "Byte 1 - Processing Options",
     bits: {
-      0x80: "SDA supported",
-      0x40: "DDA supported", 
-      0x20: "Cardholder verification is supported",
-      0x10: "Terminal risk management is to be performed",
-      0x08: "Issuer authentication is supported",
-      0x04: "Reserved for use by the payment system",
-      0x02: "CDA supported",
-      0x01: "Reserved for use by the payment system"
+      0x80: "Reserved (RFU)",
+      0x40: "SDA supported",
+      0x20: "DDA supported",
+      0x10: "Cardholder verification is supported",
+      0x08: "Terminal risk management is to be performed",
+      0x04: "Issuer authentication is supported",
+      0x02: "On device cardholder verification is supported (contactless, e.g. Mastercard Kernel 2)",
+      0x01: "CDA supported"
     }
   },
   byte2: {
     name: "Byte 2 - Additional Options",
     bits: {
-      0x80: "Reserved for use by the payment system",
+      0x80: "EMV mode is supported (contactless, e.g. Mastercard Kernel 2)",
       0x40: "Reserved for use by the payment system",
-      0x20: "Reserved for use by the payment system", 
+      0x20: "Reserved for use by the payment system",
       0x10: "Reserved for use by the payment system",
       0x08: "Reserved for use by the payment system",
       0x04: "Reserved for use by the payment system",
       0x02: "Reserved for use by the payment system",
-      0x01: "Reserved for use by the payment system"
+      0x01: "Relay resistance protocol is supported (contactless, e.g. Mastercard Kernel 2)"
     }
   }
 };
 
 // Common AIP configurations
 const COMMON_AIP_CONFIGS = [
-  { name: "SDA Only", value: "8000", desc: "Static Data Authentication only" },
-  { name: "DDA", value: "4000", desc: "Dynamic Data Authentication" },
-  { name: "CDA", value: "4200", desc: "Combined DDA/Application Cryptogram" },
-  { name: "Full Support", value: "FC00", desc: "All authentication methods" },
+  { name: "SDA Only", value: "4000", desc: "Static Data Authentication only" },
+  { name: "DDA", value: "2000", desc: "Dynamic Data Authentication" },
+  { name: "CDA", value: "2100", desc: "DDA plus Combined DDA/Application Cryptogram" },
+  { name: "Full Support", value: "7D00", desc: "All contact authentication and processing options" },
+  { name: "Mastercard wallet", value: "1B80", desc: "Contactless phone/wearable with on-device CVM, CDA, EMV mode" },
 ];
 
 interface ApplicationInterchangeProfileProps {

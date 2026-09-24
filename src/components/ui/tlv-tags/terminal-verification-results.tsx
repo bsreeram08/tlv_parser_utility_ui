@@ -32,7 +32,7 @@ export const TERMINAL_VERIFICATION_RESULTS = {
 };
 
 // TVR bit specifications based on EMV specifications (5 bytes)
-const TVR_VERIFICATION_STATUS = {
+export const TVR_VERIFICATION_STATUS = {
   byte1: {
     name: "Byte 1 - Offline Data Authentication",
     bits: {
@@ -47,7 +47,7 @@ const TVR_VERIFICATION_STATUS = {
     }
   },
   byte2: {
-    name: "Byte 2 - Cardholder Verification",
+    name: "Byte 2 - Processing Restrictions",
     bits: {
       0x80: "ICC and terminal have different application versions",
       0x40: "Expired application",
@@ -92,10 +92,11 @@ const TVR_VERIFICATION_STATUS = {
       0x40: "Issuer authentication failed",
       0x20: "Script processing failed before final GENERATE AC",
       0x10: "Script processing failed after final GENERATE AC",
-      0x08: "Reserved for use by the payment system",
-      0x04: "Reserved for use by the payment system",
-      0x02: "Reserved for use by the payment system",
-      0x01: "Reserved for use by the payment system"
+      0x08: "Relay resistance threshold exceeded (contactless)",
+      0x04: "Relay resistance time limits exceeded (contactless)",
+      // b2-b1 together: 01 = RRP not performed, 10 = RRP performed
+      0x02: "Relay resistance protocol performed (contactless)",
+      0x01: "Relay resistance protocol not performed (contactless)"
     }
   }
 };
@@ -104,7 +105,7 @@ const TVR_VERIFICATION_STATUS = {
 const COMMON_TVR_CONFIGS = [
   { name: "All OK", value: "0000000000", desc: "No verification issues" },
   { name: "Offline Auth Failed", value: "4000000000", desc: "SDA failed" },
-  { name: "PIN Failed", value: "0080000000", desc: "Cardholder verification failed" },
+  { name: "PIN Failed", value: "0000800000", desc: "Cardholder verification failed" },
   { name: "Over Floor Limit", value: "0000008000", desc: "Transaction over floor limit" },
 ];
 
