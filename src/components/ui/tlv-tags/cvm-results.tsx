@@ -34,15 +34,42 @@ export const CVM_RESULTS = {
 // CVM Types (EMV Book 4)
 const CVM_TYPES = {
   0x00: "Fail CVM processing",
-  0x01: "Plaintext PIN verification performed by ICC",
+  // Mastercard contactless (Kernel 2) reuses 01 for on-device CVM (CDCVM)
+  0x01: "Plaintext PIN verification performed by ICC (contactless: on-device CVM)",
   0x02: "Enciphered PIN verified online",
   0x03: "Plaintext PIN verification performed by ICC and signature (paper)",
   0x04: "Enciphered PIN verification performed by ICC",
   0x05: "Enciphered PIN verification performed by ICC and signature (paper)",
   0x1e: "Signature (paper)",
   0x1f: "No CVM required",
-  0x3f: "Not applicable (cash or cashback transaction)",
+  0x3f: "No CVM performed",
 };
+
+// Byte 1 bit 7: continue with the next CVM rule if this one fails
+const APPLY_SUCCEEDING = 0x40;
+const toHexByte = (n: number | string) =>
+  Number(n).toString(16).padStart(2, "0").toUpperCase();
+
+export function describeCvmMethod(byte: number): string {
+  const code = byte & 0x3f;
+  const name =
+    CVM_TYPES[code as keyof typeof CVM_TYPES] ??
+    (code >= 0x20 && code <= 0x2f
+      ? "Payment system specific CVM"
+      : code >= 0x30 && code <= 0x3e
+        ? "Issuer specific CVM"
+        : "RFU / unknown CVM");
+  return byte & APPLY_SUCCEEDING
+    ? `${name} (apply succeeding rule if unsuccessful)`
+    : name;
+}
+
+export function describeCvmCondition(byte: number): string {
+  return (
+    CVM_CONDITIONS[byte as keyof typeof CVM_CONDITIONS] ??
+    (byte >= 0x80 ? "Payment system specific condition" : "RFU / unknown condition")
+  );
+}
 
 // CVM Condition Codes
 const CVM_CONDITIONS = {
@@ -158,11 +185,9 @@ export function CVMResultsTag({ value, onChange }: CVMResultsProps) {
   };
 
   // Get current CVM information
-  const currentCvmType =
-    CVM_TYPES[parseInt(cvmType, 16) as keyof typeof CVM_TYPES] || "Unknown CVM";
-  const currentCondition =
-    CVM_CONDITIONS[parseInt(cvmCondition, 16) as keyof typeof CVM_CONDITIONS] ||
-    "Unknown condition";
+  const cvmTypeByte = parseInt(cvmType, 16) || 0;
+  const currentCvmType = describeCvmMethod(cvmTypeByte);
+  const currentCondition = describeCvmCondition(parseInt(cvmCondition, 16) || 0);
   const currentResult =
     CVM_RESULT_STATUS[
       parseInt(cvmResult, 16) as keyof typeof CVM_RESULT_STATUS
@@ -301,7 +326,16 @@ export function CVMResultsTag({ value, onChange }: CVMResultsProps) {
               </code>
             </div>
             {isEditing ? (
-              <Select value={cvmType} onValueChange={setCvmType}>
+              <Select
+                value={toHexByte(cvmTypeByte & 0x3f)}
+                onValueChange={(code) =>
+                  setCvmType(
+                    toHexByte(
+                      parseInt(code, 16) | (cvmTypeByte & APPLY_SUCCEEDING),
+                    ),
+                  )
+                }
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -309,7 +343,7 @@ export function CVMResultsTag({ value, onChange }: CVMResultsProps) {
                   {Object.entries(CVM_TYPES).map(([code, desc]) => (
                     <SelectItem
                       key={code}
-                      value={code.toString().padStart(2, "0").toUpperCase()}
+                      value={toHexByte(code)}
                     >
                       {desc}
                     </SelectItem>
@@ -338,7 +372,7 @@ export function CVMResultsTag({ value, onChange }: CVMResultsProps) {
                   {Object.entries(CVM_CONDITIONS).map(([code, desc]) => (
                     <SelectItem
                       key={code}
-                      value={code.toString().padStart(2, "0").toUpperCase()}
+                      value={toHexByte(code)}
                     >
                       {desc}
                     </SelectItem>
@@ -369,7 +403,7 @@ export function CVMResultsTag({ value, onChange }: CVMResultsProps) {
                   {Object.entries(CVM_RESULT_STATUS).map(([code, desc]) => (
                     <SelectItem
                       key={code}
-                      value={code.toString().padStart(2, "0").toUpperCase()}
+                      value={toHexByte(code)}
                     >
                       {desc}
                     </SelectItem>
