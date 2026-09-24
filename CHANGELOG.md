@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed (2026-09-24)
+- AIP (82) decoder had every byte 1 label one bit too high; now matches EMV Book C-2 A.1.16, including on-device CVM, EMV mode and relay resistance bits and corrected presets
+- CVM Results (9F34) masks the "apply succeeding rule" flag, labels payment-system and issuer ranges, notes that Mastercard contactless uses `01` for on-device CVM, and relabels `3F` as "No CVM performed"
+- CVM Results editor dropdowns wrote decimal codes (e.g. Signature saved `0x30` instead of `0x1E`)
+- TVR (95) byte 5 now decodes relay resistance bits; the "PIN Failed" preset sets byte 3 instead of byte 2
+- Tooltips share one provider with an initial delay, so neighbouring tooltips open instantly after the first
+
 ### Added
 - TLV Comparison Tool (EMV-123 Phase 4)
   - Side-by-side comparison of two TLV data streams
