@@ -207,7 +207,7 @@ export function TlvByteMap({ result }: TlvByteMapProps): JSX.Element {
                             )
                           }
                           className={cn(
-                            "w-6 rounded-sm py-0.5 text-center transition-all",
+                            "w-6 rounded-sm py-0.5 text-center transition-shadow duration-100 ease-(--ease-out)",
                             ROLE_CLASSES[info.role],
                             isSelected && "ring-1 ring-primary ring-offset-1"
                           )}

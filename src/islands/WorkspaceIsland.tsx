@@ -1,6 +1,7 @@
 import { StrictMode, useEffect, type JSX } from "react";
 import { ThemeProvider } from "next-themes";
 import App from "@/App";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { loadAndRegisterCustomBitfields } from "@/utils/tlv/load-custom-bitfields";
 import { loadAndRegisterCustomTags } from "@/utils/tlv/load-custom-tags";
 
@@ -31,7 +32,9 @@ export default function WorkspaceIsland(): JSX.Element {
   return (
     <StrictMode>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-        <App />
+        <TooltipProvider>
+          <App />
+        </TooltipProvider>
       </ThemeProvider>
     </StrictMode>
   );
