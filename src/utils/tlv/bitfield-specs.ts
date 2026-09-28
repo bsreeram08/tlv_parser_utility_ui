@@ -530,6 +530,158 @@ const SECURITY_CAPABILITY_DF811F: BitfieldSpec = {
   presets: [{ name: "CDA only", value: "08", desc: "Combined DDA/AC generation" }],
 };
 
+/* --------------------------------- TVR layout (shared by TACs) ------------ */
+
+const TVR_BYTES: readonly ByteDef[] = [
+  {
+    name: "Byte 1 — Offline Data Authentication",
+    bits: [
+      { mask: 0x80, label: "Offline data authentication was not performed" },
+      { mask: 0x40, label: "SDA failed" },
+      { mask: 0x20, label: "ICC data missing" },
+      { mask: 0x10, label: "Card appears on terminal exception file" },
+      { mask: 0x08, label: "DDA failed" },
+      { mask: 0x04, label: "CDA failed" },
+      { mask: 0x02, label: "SDA selected" },
+      { mask: 0x01, label: RFU },
+    ],
+  },
+  {
+    name: "Byte 2 — Processing Restrictions",
+    bits: [
+      { mask: 0x80, label: "ICC and terminal have different application versions" },
+      { mask: 0x40, label: "Expired application" },
+      { mask: 0x20, label: "Application not yet effective" },
+      { mask: 0x10, label: "Requested service not allowed for card product" },
+      { mask: 0x08, label: "New card" },
+    ],
+  },
+  {
+    name: "Byte 3 — Cardholder Verification",
+    bits: [
+      { mask: 0x80, label: "Cardholder verification was not successful" },
+      { mask: 0x40, label: "Unrecognised CVM" },
+      { mask: 0x20, label: "PIN Try Limit exceeded" },
+      { mask: 0x10, label: "PIN entry required and PIN pad not present or not working" },
+      { mask: 0x08, label: "PIN entry required, PIN pad present, but PIN was not entered" },
+      { mask: 0x04, label: "Online PIN entered" },
+    ],
+  },
+  {
+    name: "Byte 4 — Terminal Risk Management",
+    bits: [
+      { mask: 0x80, label: "Transaction exceeds floor limit" },
+      { mask: 0x40, label: "Lower consecutive offline limit exceeded" },
+      { mask: 0x20, label: "Upper consecutive offline limit exceeded" },
+      { mask: 0x10, label: "Transaction selected randomly for online processing" },
+      { mask: 0x08, label: "Merchant forced transaction online" },
+    ],
+  },
+  {
+    name: "Byte 5 — Issuer Authentication",
+    bits: [
+      { mask: 0x80, label: "Default TDOL used" },
+      { mask: 0x40, label: "Issuer authentication failed" },
+      { mask: 0x20, label: "Script processing failed before final GENERATE AC" },
+      { mask: 0x10, label: "Script processing failed after final GENERATE AC" },
+      { mask: 0x08, label: "Relay resistance threshold exceeded (contactless)" },
+      { mask: 0x04, label: "Relay resistance time limits exceeded (contactless)" },
+      { mask: 0x02, label: "Relay resistance protocol performed (contactless)" },
+      { mask: 0x01, label: "Relay resistance protocol not performed (contactless)" },
+    ],
+  },
+];
+
+const TAC_DEFAULT_DF8120: BitfieldSpec = {
+  tag: "DF8120",
+  name: "Terminal Action Code – Default",
+  description:
+    "TAC applied when the terminal completes processing offline. Each bit mirrors the TVR: if both the TAC bit and the corresponding TVR bit are set, the action (decline or go online) triggers.",
+  ref: K2_REF,
+  note: "Kernel 2 (Mastercard). Bit layout identical to the TVR (tag 95).",
+  bytes: TVR_BYTES,
+  presets: [
+    { name: "All clear", value: "0000000000", desc: "No offline decline triggers" },
+  ],
+};
+
+const TAC_DENIAL_DF8121: BitfieldSpec = {
+  tag: "DF8121",
+  name: "Terminal Action Code – Denial",
+  description:
+    "TAC applied to decline the transaction offline. If any bit set here is also set in the TVR, the terminal declines without going online.",
+  ref: K2_REF,
+  note: "Kernel 2 (Mastercard). Bit layout identical to the TVR (tag 95).",
+  bytes: TVR_BYTES,
+  presets: [
+    { name: "All clear", value: "0000000000", desc: "Never decline offline on TVR alone" },
+  ],
+};
+
+const TAC_ONLINE_DF8122: BitfieldSpec = {
+  tag: "DF8122",
+  name: "Terminal Action Code – Online",
+  description:
+    "TAC applied when the terminal goes online. If any bit set here is also set in the TVR, the terminal requests online authorization.",
+  ref: K2_REF,
+  note: "Kernel 2 (Mastercard). Bit layout identical to the TVR (tag 95).",
+  bytes: TVR_BYTES,
+  presets: [
+    { name: "All clear", value: "0000000000", desc: "No forced-online triggers from TVR" },
+  ],
+};
+
+const KERNEL_ID_DF810C: BitfieldSpec = {
+  tag: "DF810C",
+  name: "Kernel ID",
+  description: "Identifies the contactless kernel.",
+  ref: K2_REF,
+  bytes: [
+    {
+      name: "Kernel",
+      enums: [
+        {
+          mask: 0xff,
+          label: "Kernel",
+          values: {
+            0x00: "00 — Reserved / not specified",
+            0x02: "02 — Mastercard (PayPass)",
+            0x03: "03 — Visa (payWave)",
+            0x04: "04 — American Express (ExpressPay)",
+            0x05: "05 — JCB (J/Speedy)",
+            0x06: "06 — Discover (D-PAS / Diners Club / ZIP)",
+            0x07: "07 — UnionPay (QuickPass)",
+          },
+        },
+      ],
+    },
+  ],
+};
+
+const PROCEED_TO_FIRST_WRITE_DF8110: BitfieldSpec = {
+  tag: "DF8110",
+  name: "Proceed To First Write Flag",
+  description:
+    "Controls whether the kernel proceeds to the first write in an IDS transaction.",
+  ref: K2_REF,
+  note: "Kernel 2 (Mastercard). 00 = do not proceed, 01 = proceed.",
+  bytes: [
+    {
+      name: "Flag",
+      enums: [
+        {
+          mask: 0xff,
+          label: "Proceed",
+          values: {
+            0x00: "00 — Do not proceed to first write",
+            0x01: "01 — Proceed to first write",
+          },
+        },
+      ],
+    },
+  ],
+};
+
 /** All bitfield specs, keyed by tag. */
 export const bitfieldSpecs: Readonly<Record<string, BitfieldSpec>> = {
   DF8117: CARD_DATA_INPUT_CAPABILITY_DF8117,
@@ -546,6 +698,11 @@ export const bitfieldSpecs: Readonly<Record<string, BitfieldSpec>> = {
   "9B": TSI_9B,
   "9F27": CID_9F27,
   "9F35": TERMINAL_TYPE_9F35,
+  DF8120: TAC_DEFAULT_DF8120,
+  DF8121: TAC_DENIAL_DF8121,
+  DF8122: TAC_ONLINE_DF8122,
+  DF810C: KERNEL_ID_DF810C,
+  DF8110: PROCEED_TO_FIRST_WRITE_DF8110,
 };
 
 /** Expected value length in bytes for a spec. */
