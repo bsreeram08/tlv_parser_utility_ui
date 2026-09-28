@@ -268,6 +268,94 @@ export const ADDITIONAL_STANDARD_TAGS: EmvTag[] = [
     fixedLength: 4,
     valueType: "numeric",
   },
+  {
+    id: "5F36",
+    name: "Transaction Currency Exponent",
+    description:
+      "Indicates the implied position of the decimal point from the right of the transaction amount. EMV 4.4 Book 3, Annex A.",
+    format: TagFormat.PRIMITIVE,
+    class: TagClass.APPLICATION,
+    fixedLength: 1,
+    valueType: "numeric",
+  },
+  {
+    id: "71",
+    name: "Issuer Script Template 1",
+    description:
+      "Contains proprietary issuer data for script processing at the terminal before the second GENERATE AC. EMV 4.4 Book 3.",
+    format: TagFormat.CONSTRUCTED,
+    class: TagClass.CONTEXT_SPECIFIC,
+  },
+  {
+    id: "72",
+    name: "Issuer Script Template 2",
+    description:
+      "Contains proprietary issuer data for script processing at the terminal after the second GENERATE AC. EMV 4.4 Book 3.",
+    format: TagFormat.CONSTRUCTED,
+    class: TagClass.CONTEXT_SPECIFIC,
+  },
+  {
+    id: "81",
+    name: "Amount, Authorised (Binary)",
+    description:
+      "Authorised amount of the transaction (excluding adjustments), in binary format. EMV 4.4 Book 3, Annex A.",
+    format: TagFormat.PRIMITIVE,
+    class: TagClass.CONTEXT_SPECIFIC,
+    fixedLength: 4,
+  },
+  {
+    id: "9F12",
+    name: "Application Preferred Name",
+    description:
+      "Preferred mnemonic associated with the AID. If present, used instead of tag 50 Application Label. EMV 4.4 Book 3, Annex A.",
+    format: TagFormat.PRIMITIVE,
+    class: TagClass.CONTEXT_SPECIFIC,
+    minLength: 1,
+    maxLength: 16,
+    valueType: "text",
+  },
+  {
+    id: "9F1B",
+    name: "Terminal Floor Limit",
+    description:
+      "Indicates the floor limit in the terminal in conjunction with the AID. EMV 4.4 Book 4, Annex A.",
+    format: TagFormat.PRIMITIVE,
+    class: TagClass.CONTEXT_SPECIFIC,
+    fixedLength: 4,
+  },
+  {
+    id: "9F7A",
+    name: "VLP Support Indicator",
+    description:
+      "Indicates the terminal's support for VLP (Visa Low-value Payment / Electronic Commerce). Book C-3 (Kernel 3).",
+    format: TagFormat.PRIMITIVE,
+    class: TagClass.CONTEXT_SPECIFIC,
+    fixedLength: 1,
+  },
+  {
+    id: "9F7C",
+    name: "Customer Exclusive Data",
+    description:
+      "Merchant custom data or customer exclusive data passed through to the issuer. Book C-3 (Kernel 3) / Book C-6 (Kernel 6).",
+    format: TagFormat.PRIMITIVE,
+    class: TagClass.CONTEXT_SPECIFIC,
+  },
+  {
+    id: "C0",
+    name: "Kernel-specific Tag C0",
+    description:
+      "Kernel-specific data element. In Kernel 3 (Visa) this typically carries a copy of the Outcome Parameter Set; in other kernels its meaning varies. Not defined in the base EMV 4.4 books.",
+    format: TagFormat.PRIMITIVE,
+    class: TagClass.CONTEXT_SPECIFIC,
+  },
+  {
+    id: "C1",
+    name: "Kernel-specific Tag C1",
+    description:
+      "Kernel-specific data element. In Kernel 3 (Visa) and Kernel 6 (Discover) this typically carries the User Interface Request Data or a discretionary data object. Not defined in the base EMV 4.4 books.",
+    format: TagFormat.PRIMITIVE,
+    class: TagClass.CONTEXT_SPECIFIC,
+  },
 ];
 
 /**
