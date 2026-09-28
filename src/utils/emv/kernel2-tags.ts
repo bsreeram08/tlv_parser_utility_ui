@@ -349,6 +349,34 @@ export const ADDITIONAL_STANDARD_TAGS: EmvTag[] = [
     class: TagClass.CONTEXT_SPECIFIC,
   },
   {
+    id: "42",
+    name: "Issuer Identification Number (IIN)",
+    description:
+      "The number that identifies the major industry and the card issuer. EMV 4.4 Book 3, Annex A.",
+    format: TagFormat.PRIMITIVE,
+    class: TagClass.APPLICATION,
+    fixedLength: 3,
+    valueType: "numeric",
+  },
+  {
+    id: "8F",
+    name: "Certification Authority Public Key Index",
+    description:
+      "Identifies the certification authority's public key in conjunction with the RID. EMV 4.4 Book 3, Annex A.",
+    format: TagFormat.PRIMITIVE,
+    class: TagClass.CONTEXT_SPECIFIC,
+    fixedLength: 1,
+  },
+  {
+    id: "9F24",
+    name: "Payment Account Reference (PAR)",
+    description:
+      "A non-financial reference to the PAN, used to link transactions across tokens and PANs. EMV Payment Tokenisation Specification.",
+    format: TagFormat.PRIMITIVE,
+    class: TagClass.CONTEXT_SPECIFIC,
+    fixedLength: 29,
+  },
+  {
     id: "C1",
     name: "Kernel-specific Tag C1",
     description:
