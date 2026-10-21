@@ -95,6 +95,14 @@ function registerStandardFields(): void {
       description: "Card expiration date in YYMM format",
     },
     {
+      id: 18,
+      name: "Merchant Type",
+      format: FieldFormat.NUMERIC,
+      length: 4,
+      lengthType: LengthType.FIXED,
+      description: "Merchant category code (ISO 18245)",
+    },
+    {
       id: 19,
       name: "Acquiring Institution Country Code",
       format: FieldFormat.NUMERIC,
@@ -123,6 +131,14 @@ function registerISO8583_1987Fields(): void {
       length: 3,
       lengthType: LengthType.FIXED,
       description: "Method by which the PAN was entered, and PIN capability",
+    },
+    {
+      id: 23,
+      name: "Card Sequence Number",
+      format: FieldFormat.NUMERIC,
+      length: 3,
+      lengthType: LengthType.FIXED,
+      description: "PAN sequence number (EMV tag 5F34)",
     },
     {
       id: 24,

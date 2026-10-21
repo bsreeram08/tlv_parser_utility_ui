@@ -9,6 +9,12 @@ import {
   getTool,
   getToolOrDefault,
 } from "@/tools/registry";
+import {
+  DEEP_LINK_ERROR_MESSAGES,
+  parseDeepLink,
+  type DeepLinkInput,
+  type DeepLinkResult,
+} from "@/utils/deep-link";
 import { toast } from "sonner";
 
 const WORKSPACE_STORAGE_KEY = "payment-utilities-tool-canvas-v1";
@@ -20,6 +26,19 @@ function requestedToolId(): string {
   if (requested && getTool(requested)) return requested;
   if (params.has("config")) return "emv-config";
   return DEFAULT_TOOL_ID;
+}
+
+function currentDeepLink(): DeepLinkResult {
+  return parseDeepLink(window.location.search, window.location.hash);
+}
+
+/** Drop the consumed `#input=` so a reload does not open the pane again. */
+function clearDeepLinkFragment(): void {
+  window.history.replaceState(
+    window.history.state,
+    "",
+    `${window.location.pathname}${window.location.search}`
+  );
 }
 
 function createPanel(toolId: string): ToolPanel {
@@ -45,8 +64,13 @@ function isStoredPanel(value: unknown): value is ToolPanel {
   );
 }
 
-function initialPanels(): ToolPanel[] {
+function createSeededPanel(link: DeepLinkInput): ToolPanel {
+  return { ...createPanel(link.toolId), initialInput: link.input };
+}
+
+function initialPanels(link: DeepLinkInput | null): ToolPanel[] {
   const requested = requestedToolId();
+  const seeded = link ? [createSeededPanel(link)] : [];
   try {
     const stored = localStorage.getItem(WORKSPACE_STORAGE_KEY);
     if (stored) {
@@ -54,6 +78,7 @@ function initialPanels(): ToolPanel[] {
       if (Array.isArray(parsed)) {
         const panels = parsed.filter(isStoredPanel);
         if (panels.length > 0) {
+          if (link) return [...panels, ...seeded];
           const hasRequested = panels.some((panel) => panel.toolId === requested);
           return hasRequested ? panels : [...panels, createPanel(requested)];
         }
@@ -62,7 +87,7 @@ function initialPanels(): ToolPanel[] {
   } catch {
     // A corrupt saved canvas should not prevent the utilities from opening.
   }
-  return [createPanel(requested)];
+  return link ? seeded : [createPanel(requested)];
 }
 
 function initialActivePanelId(panels: ToolPanel[]): string | null {
@@ -78,9 +103,15 @@ function initialActivePanelId(panels: ToolPanel[]): string | null {
 }
 
 function App() {
-  const [panels, setPanels] = useState<ToolPanel[]>(initialPanels);
+  // Read once without side effects; StrictMode may run initializers twice.
+  const [launchLink] = useState(currentDeepLink);
+  const [panels, setPanels] = useState<ToolPanel[]>(() =>
+    initialPanels(launchLink.kind === "ok" ? launchLink.link : null)
+  );
   const [activePanelId, setActivePanelId] = useState<string | null>(
-    () => initialActivePanelId(panels)
+    () =>
+      panels.find((panel) => panel.initialInput !== undefined)?.id ??
+      initialActivePanelId(panels)
   );
   const [lastToolId, setLastToolId] = useState(
     () =>
@@ -90,7 +121,9 @@ function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(panels));
+      // Deep-link input is card data; keep it out of the saved canvas.
+      const stored = panels.map(({ initialInput: _input, ...panel }) => panel);
+      localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(stored));
     } catch {
       // Canvas persistence is a convenience; the tools still work without it.
     }
@@ -120,9 +153,8 @@ function App() {
     );
   }, [lastToolId]);
 
-  const addTool = useCallback((toolId: string) => {
-    const tool = getToolOrDefault(toolId);
-    const added = createPanel(tool.id);
+  const insertPanel = useCallback((added: ToolPanel) => {
+    const tool = getToolOrDefault(added.toolId);
     setPanels((current) => {
       const activeIndex = current.findIndex(
         (panel) => panel.id === activePanelId
@@ -139,6 +171,41 @@ function App() {
       duration: 1800,
     });
   }, [activePanelId]);
+
+  const addTool = useCallback(
+    (toolId: string) => insertPanel(createPanel(getToolOrDefault(toolId).id)),
+    [insertPanel]
+  );
+
+  useEffect(() => {
+    if (launchLink.kind === "none") return;
+    if (launchLink.kind === "error") {
+      toast.error("Could not open the link", {
+        description: DEEP_LINK_ERROR_MESSAGES[launchLink.error],
+        id: "deep-link-error",
+      });
+    }
+    clearDeepLinkFragment();
+  }, [launchLink]);
+
+  // A second link clicked into an already-open tab only changes the fragment.
+  useEffect(() => {
+    const onHashChange = () => {
+      const result = currentDeepLink();
+      if (result.kind === "none") return;
+      clearDeepLinkFragment();
+      if (result.kind === "error") {
+        toast.error("Could not open the link", {
+          description: DEEP_LINK_ERROR_MESSAGES[result.error],
+          id: "deep-link-error",
+        });
+        return;
+      }
+      insertPanel(createSeededPanel(result.link));
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, [insertPanel]);
 
   const updatePanel = useCallback(
     (panelId: string, update: (panel: ToolPanel) => ToolPanel) => {

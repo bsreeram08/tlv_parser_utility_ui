@@ -51,6 +51,8 @@ export type ToolPanel = {
   collapsed: boolean;
   archived: boolean;
   wide: boolean;
+  /** Deep-link input for a new pane. Kept in memory only, never persisted. */
+  initialInput?: string;
 };
 
 type ViewMode = "split" | "tabs";
@@ -859,7 +861,11 @@ function ToolPanelFrame({
         )}
       >
         {mounted && (
-          <ToolPanelProvider instanceId={panel.id} active={active && visible}>
+          <ToolPanelProvider
+            instanceId={panel.id}
+            active={active && visible}
+            initialInput={panel.initialInput}
+          >
             {tool.kind === "component" ? (
               <Suspense fallback={<ToolLoading name={tool.name} />}>
                 <tool.component />

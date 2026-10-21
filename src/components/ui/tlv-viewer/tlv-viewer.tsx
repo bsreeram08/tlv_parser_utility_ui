@@ -131,7 +131,11 @@ function AnimatedParseErrors({
 }
 
 export function TlvViewer(): JSX.Element {
-  const { instanceId, active: panelActive } = useToolPanelContext();
+  const {
+    instanceId,
+    active: panelActive,
+    initialInput,
+  } = useToolPanelContext();
   const loadButtonId = `${instanceId}-load-tlv`;
   const showUnknownId = `${instanceId}-show-unknown-tags`;
   const [parseResult, setParseResult] = useState<TlvParsingResult | null>(null);
@@ -175,15 +179,16 @@ export function TlvViewer(): JSX.Element {
     []
   );
 
-  // Load last input & prefs on mount
+  // Load deep-link or last input & prefs on mount
   useEffect(() => {
     // Initialization only
     if (!parseResult && !inputHex) {
       try {
-        const last = localStorage.getItem("lastTlvInput");
+        const last = initialInput ?? localStorage.getItem("lastTlvInput");
         if (last) {
           setInputHex(last);
-          handleParse(last);
+          // Linked input can be card data; keep it out of localStorage.
+          handleParse(last, initialInput === undefined);
         }
         const pref = localStorage.getItem("showUnknownTags");
         if (pref) setShowUnknownTags(pref === "true");
@@ -191,7 +196,7 @@ export function TlvViewer(): JSX.Element {
         /* ignore */
       }
     }
-  }, [parseResult, inputHex]);
+  }, [parseResult, inputHex, initialInput]);
 
   useEffect(() => {
     const listener = () => {
@@ -208,7 +213,7 @@ export function TlvViewer(): JSX.Element {
   /**
    * Handle parsing of TLV data
    */
-  function handleParse(hexString: string): void {
+  function handleParse(hexString: string, persist = true): void {
     setInputHex(hexString);
 
     try {
@@ -237,7 +242,7 @@ export function TlvViewer(): JSX.Element {
       setActiveTab("results");
       // persist last input
       try {
-        localStorage.setItem("lastTlvInput", hexString);
+        if (persist) localStorage.setItem("lastTlvInput", hexString);
       } catch (e) {
         // ignore
       }
