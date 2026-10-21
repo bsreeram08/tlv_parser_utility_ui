@@ -211,21 +211,24 @@ export function TransactionTypeTag({ value, onChange }: TransactionTypeProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [selectedType, setSelectedType] = useState<string>("");
 
-  // Convert hex to transaction type
+  // Convert hex to transaction type (2-digit BCD hex represents 2-digit ISO 8583 type)
   const hexToTransactionType = (hexStr: string): string => {
-    const validHex = hexStr
+    return hexStr
       .replace(/[^0-9A-Fa-f]/g, "")
       .padEnd(2, "0")
-      .substring(0, 2);
-
-    const decimal = parseInt(validHex, 16);
-    return decimal.toString().padStart(2, "0");
+      .substring(0, 2)
+      .toUpperCase();
   };
 
-  // Convert transaction type to hex
+  // Convert transaction type to hex (2-digit BCD code)
   const transactionTypeToHex = (type: string): string => {
-    const decimal = parseInt(type, 10);
-    return decimal.toString(16).padStart(2, "0").toUpperCase();
+    return type.padStart(2, "0").toUpperCase();
+  };
+
+  const handleCancel = () => {
+    setHexValue(value.toUpperCase());
+    setSelectedType(hexToTransactionType(value));
+    setIsEditing(false);
   };
 
   // Initialize transaction type when value changes
@@ -325,7 +328,7 @@ export function TransactionTypeTag({ value, onChange }: TransactionTypeProps) {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setIsEditing(false)}
+                  onClick={handleCancel}
                 >
                   <X className="h-3 w-3 mr-1" />
                   Cancel
