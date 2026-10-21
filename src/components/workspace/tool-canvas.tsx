@@ -427,6 +427,13 @@ export function ToolCanvas({
           onRestore={onRestore}
           onClose={onClose}
         />
+        <span
+          className="px-1 font-mono text-[10px] text-muted-foreground"
+          title={`Built ${__BUILD_TIME__}`}
+          data-testid="build-version"
+        >
+          {__BUILD_VERSION__}
+        </span>
         </div>
 
         {openPanels.length > 0 && (viewMode === "tabs" || zoomedPanelId) && (
