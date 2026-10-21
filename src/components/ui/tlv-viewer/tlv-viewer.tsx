@@ -187,7 +187,8 @@ export function TlvViewer(): JSX.Element {
         const last = initialInput ?? localStorage.getItem("lastTlvInput");
         if (last) {
           setInputHex(last);
-          handleParse(last);
+          // Linked input can be card data; keep it out of localStorage.
+          handleParse(last, initialInput === undefined);
         }
         const pref = localStorage.getItem("showUnknownTags");
         if (pref) setShowUnknownTags(pref === "true");
@@ -212,7 +213,7 @@ export function TlvViewer(): JSX.Element {
   /**
    * Handle parsing of TLV data
    */
-  function handleParse(hexString: string): void {
+  function handleParse(hexString: string, persist = true): void {
     setInputHex(hexString);
 
     try {
@@ -241,7 +242,7 @@ export function TlvViewer(): JSX.Element {
       setActiveTab("results");
       // persist last input
       try {
-        localStorage.setItem("lastTlvInput", hexString);
+        if (persist) localStorage.setItem("lastTlvInput", hexString);
       } catch (e) {
         // ignore
       }
