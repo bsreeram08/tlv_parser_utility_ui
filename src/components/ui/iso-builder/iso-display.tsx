@@ -14,6 +14,8 @@ import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { parseTlv } from "@/utils/tlv";
+import type { TlvElement } from "@/types/tlv";
 import {
   getMtiClassDescription,
   getMtiFunctionDescription,
@@ -332,6 +334,54 @@ function FieldRow({ field }: FieldAccordionItemProps): JSX.Element {
       >
         <Copy className="size-3.5" />
       </Button>
+
+      {field.id === ICC_DATA_FIELD && <IccDataTags hex={field.value} />}
+    </div>
+  );
+}
+
+/** DE 55 carries EMV BER-TLV; decode it in place rather than leaving a hex blob. */
+const ICC_DATA_FIELD = 55;
+
+type IccTagRow = { readonly depth: number; readonly element: TlvElement };
+
+export function iccDataRows(hex: string): IccTagRow[] {
+  const result = parseTlv(hex);
+  if (result.errors.length > 0) return [];
+  const rows: IccTagRow[] = [];
+  const walk = (elements: TlvElement[], depth: number) => {
+    for (const element of elements) {
+      rows.push({ depth, element });
+      if (element.children) walk(element.children, depth + 1);
+    }
+  };
+  walk(result.elements, 0);
+  return rows;
+}
+
+function IccDataTags({ hex }: { hex: string }): JSX.Element | null {
+  const rows = useMemo(() => iccDataRows(hex), [hex]);
+  if (rows.length === 0) return null;
+  return (
+    <div className="col-span-3 rounded border bg-muted/20 md:col-span-5" aria-label="Field 55 EMV tags">
+      <div className="border-b px-2 py-1 text-[10px] font-medium text-muted-foreground">
+        EMV tags in field 55 · {rows.length}
+      </div>
+      {rows.map(({ depth, element }, index) => (
+        <div
+          key={`${element.tag}-${index}`}
+          className="grid grid-cols-[4rem_minmax(0,1fr)] gap-x-2 px-2 py-0.5 text-[11px] md:grid-cols-[4rem_minmax(10rem,0.9fr)_minmax(0,1.1fr)]"
+          style={{ paddingLeft: `${0.5 + depth}rem` }}
+        >
+          <code className="font-mono">{element.tag}</code>
+          <span className="truncate text-muted-foreground" title={element.tagInfo?.name}>
+            {element.tagInfo?.name ?? "Unknown tag"}
+          </span>
+          <code className="col-span-2 select-all break-all font-mono md:col-span-1">
+            {element.children ? "" : element.value}
+          </code>
+        </div>
+      ))}
     </div>
   );
 }

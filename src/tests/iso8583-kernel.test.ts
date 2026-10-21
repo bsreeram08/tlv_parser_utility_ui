@@ -18,3 +18,13 @@ test("emv-kernel 0100 with DE 18 and DE 23 parses field by field", () => {
   strictEqual(value(49), "752");
   strictEqual(result.fields[55]?.value.toUpperCase().replace(/\s/g, ""), "9F2602AABB");
 });
+
+test("field 55 of an emv-kernel 0100 decodes into its EMV tags", async () => {
+  const { iccDataRows } = await import("@/components/ui/iso-builder/iso-display");
+  const field55 = parseIso8583(kernel0100).fields[55]?.value ?? "";
+  const rows = iccDataRows(field55);
+  strictEqual(rows.length, 1);
+  strictEqual(rows[0]?.element.tag, "9F26");
+  strictEqual(rows[0]?.element.value, "AABB");
+  deepStrictEqual(iccDataRows("ZZ"), []);
+});
