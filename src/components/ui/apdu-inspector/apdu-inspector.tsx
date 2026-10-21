@@ -22,6 +22,7 @@ import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { CompactTlvDisplay } from "@/components/ui/tlv-viewer/compact-tlv-display";
 import { parseTlv } from "@/utils/tlv";
 import { decodeApdu, type ApduKind } from "@/utils/apdu/apdu-decoder";
+import { useToolPanelContext } from "@/components/workspace/tool-panel-context";
 
 const EXAMPLES: Record<ApduKind, { label: string; value: string }[]> = {
   command: [
@@ -40,8 +41,9 @@ const EXAMPLES: Record<ApduKind, { label: string; value: string }[]> = {
 
 export function ApduInspector(): JSX.Element {
   const inputId = useId();
+  const { initialInput } = useToolPanelContext();
   const [kind, setKind] = useState<ApduKind>("command");
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(initialInput ?? "");
 
   const decoded = useMemo(
     () => (input.trim() ? decodeApdu(input, kind) : null),

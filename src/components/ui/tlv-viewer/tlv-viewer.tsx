@@ -131,7 +131,11 @@ function AnimatedParseErrors({
 }
 
 export function TlvViewer(): JSX.Element {
-  const { instanceId, active: panelActive } = useToolPanelContext();
+  const {
+    instanceId,
+    active: panelActive,
+    initialInput,
+  } = useToolPanelContext();
   const loadButtonId = `${instanceId}-load-tlv`;
   const showUnknownId = `${instanceId}-show-unknown-tags`;
   const [parseResult, setParseResult] = useState<TlvParsingResult | null>(null);
@@ -175,12 +179,12 @@ export function TlvViewer(): JSX.Element {
     []
   );
 
-  // Load last input & prefs on mount
+  // Load deep-link or last input & prefs on mount
   useEffect(() => {
     // Initialization only
     if (!parseResult && !inputHex) {
       try {
-        const last = localStorage.getItem("lastTlvInput");
+        const last = initialInput ?? localStorage.getItem("lastTlvInput");
         if (last) {
           setInputHex(last);
           handleParse(last);
@@ -191,7 +195,7 @@ export function TlvViewer(): JSX.Element {
         /* ignore */
       }
     }
-  }, [parseResult, inputHex]);
+  }, [parseResult, inputHex, initialInput]);
 
   useEffect(() => {
     const listener = () => {

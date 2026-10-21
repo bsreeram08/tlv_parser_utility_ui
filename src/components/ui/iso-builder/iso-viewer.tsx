@@ -21,17 +21,29 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FloatingActionButton } from "@/components/ui/fab";
 import { toast } from "sonner";
+import { useToolPanelContext } from "@/components/workspace/tool-panel-context";
 
 // Example ISO 8583 message for demonstration
 const EXAMPLE_ISO_MESSAGE =
   "0100722000000000000004000000000000012345678901234567890610000000000001234567890123456789012345678901234567";
 
 export function IsoViewer(): JSX.Element {
+  const { initialInput } = useToolPanelContext();
+  // A deep-linked pane opens already parsed, with the input-form defaults.
   const [parseResult, setParseResult] = useState<Iso8583ParseResult | null>(
-    null
+    () =>
+      initialInput
+        ? parseIso8583(initialInput, {
+            version: Iso8583Version.V1987,
+            binaryBitmap: false,
+            validateFields: true,
+          })
+        : null
   );
-  const [activeTab, setActiveTab] = useState<string>("input");
-  const [inputMessage, setInputMessage] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<string>(
+    initialInput ? "results" : "input"
+  );
+  const [inputMessage, setInputMessage] = useState<string>(initialInput ?? "");
 
   /**
    * Handle parsing of ISO 8583 message

@@ -7,10 +7,11 @@ import {
 export function ToolPanelProvider({
   instanceId,
   active,
+  initialInput,
   children,
 }: ToolPanelContextValue & { children: ReactNode }) {
   return (
-    <ToolPanelContext.Provider value={{ instanceId, active }}>
+    <ToolPanelContext.Provider value={{ instanceId, active, initialInput }}>
       {children}
     </ToolPanelContext.Provider>
   );
