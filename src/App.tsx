@@ -78,7 +78,9 @@ function initialPanels(link: DeepLinkInput | null): ToolPanel[] {
       if (Array.isArray(parsed)) {
         const panels = parsed.filter(isStoredPanel);
         if (panels.length > 0) {
-          if (link) return [...panels, ...seeded];
+          // Put the linked pane first: on a full workspace an appended pane can
+          // load off-screen, leaving an older, empty pane of the same tool in view.
+          if (link) return [...seeded, ...panels];
           const hasRequested = panels.some((panel) => panel.toolId === requested);
           return hasRequested ? panels : [...panels, createPanel(requested)];
         }

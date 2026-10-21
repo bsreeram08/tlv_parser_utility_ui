@@ -81,9 +81,9 @@ export function TransactionDateTag({ value, onChange }: TransactionDateProps) {
     if (validHex === "000000") return undefined;
 
     try {
-      const year = parseInt(validHex.substring(0, 2));
-      const month = parseInt(validHex.substring(2, 4));
-      const day = parseInt(validHex.substring(4, 6));
+      const year = parseInt(validHex.substring(0, 2), 10);
+      const month = parseInt(validHex.substring(2, 4), 10);
+      const day = parseInt(validHex.substring(4, 6), 10);
 
       // Handle Y2K for transaction dates - assume years 00-99 are 20xx
       // Transaction dates are typically current/recent, so all 2-digit years map to 2000-2099
@@ -111,14 +111,14 @@ export function TransactionDateTag({ value, onChange }: TransactionDateProps) {
     }
   };
 
-  // Convert Date object to hex YYMMDD
+  // Convert Date object to hex YYMMDD (BCD packed decimal)
   const dateToHex = (date: Date): string => {
     const year = date.getFullYear() % 100; // Get last 2 digits
     const month = date.getMonth() + 1;
     const day = date.getDate();
 
     return [year, month, day]
-      .map((n) => n.toString(16).padStart(2, "0").toUpperCase())
+      .map((n) => String(n).padStart(2, "0"))
       .join("");
   };
 
@@ -182,9 +182,14 @@ export function TransactionDateTag({ value, onChange }: TransactionDateProps) {
     return format(date, "PPP"); // e.g., "December 25, 2024"
   };
 
-  // Check if date is valid
-  const isValidDate = selectedDate !== undefined;
   const currentDate = hexToDate(value);
+  const isValidDate = (isEditing ? selectedDate : currentDate) !== undefined;
+
+  const handleCancel = () => {
+    setHexValue(value.toUpperCase());
+    setSelectedDate(hexToDate(value));
+    setIsEditing(false);
+  };
 
   return (
     <Card className="w-full">
@@ -231,7 +236,7 @@ export function TransactionDateTag({ value, onChange }: TransactionDateProps) {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setIsEditing(false)}
+                  onClick={handleCancel}
                 >
                   <X className="h-3 w-3 mr-1" />
                   Cancel

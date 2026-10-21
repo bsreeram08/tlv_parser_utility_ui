@@ -113,6 +113,13 @@ export function TerminalCapabilitiesTag({
     setIsEditing(false);
   };
 
+  // Revert changes on cancel
+  const handleCancel = () => {
+    setHexValue(value.toUpperCase());
+    setByteValues(parseHexToBytes(value, 3));
+    setIsEditing(false);
+  };
+
   // Copy to clipboard
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -164,7 +171,7 @@ export function TerminalCapabilitiesTag({
                 <Button size="sm" onClick={handleSave}>
                   <Save className="h-3 w-3 mr-1" />Save
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => setIsEditing(false)}>
+                <Button size="sm" variant="outline" onClick={handleCancel}>
                   <X className="h-3 w-3 mr-1" />Cancel
                 </Button>
               </>
