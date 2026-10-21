@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { groupedTools, searchTools } from "@/tools/registry";
+import { BUILD_LABEL, BUILD_TITLE } from "@/lib/build-info";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -179,10 +180,19 @@ export function MainLayout({
 
           <div
             className={cn(
-              "flex border-t p-1.5",
-              sidebarCollapsed ? "justify-center" : "justify-end"
+              "flex items-center border-t p-1.5",
+              sidebarCollapsed ? "justify-center" : "justify-between"
             )}
           >
+            {!sidebarCollapsed && (
+              <span
+                className="truncate px-1.5 text-[10px] text-muted-foreground"
+                title={BUILD_TITLE}
+                data-testid="build-version"
+              >
+                Updated {BUILD_LABEL}
+              </span>
+            )}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
