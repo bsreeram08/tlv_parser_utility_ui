@@ -71,6 +71,15 @@ type ToolCanvasProps = {
   onSetAllCollapsed: (collapsed: boolean) => void;
 };
 
+// Viewer-local release time, e.g. "21 Oct 2026, 15:17"; the commit is in the tooltip.
+const BUILD_LABEL = new Date(__BUILD_TIME__).toLocaleString(undefined, {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
 const SHORTCUTS = [
   ["⌥← / ⌥→", "Previous / next pane"],
   ["⌥⇧← / ⌥⇧→", "Move pane left / right"],
@@ -428,11 +437,11 @@ export function ToolCanvas({
           onClose={onClose}
         />
         <span
-          className="px-1 font-mono text-[10px] text-muted-foreground"
-          title={`Built ${__BUILD_TIME__}`}
+          className="whitespace-nowrap px-1 text-[10px] text-muted-foreground"
+          title={`Commit ${__BUILD_VERSION__}, built ${__BUILD_TIME__}`}
           data-testid="build-version"
         >
-          {__BUILD_VERSION__}
+          Updated {BUILD_LABEL}
         </span>
         </div>
 
