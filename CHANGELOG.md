@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added (2026-10-21)
+- Deep links: `?tool=tlv|iso8583|apdu#input=<hex>` opens a new pane with the input parsed. The input travels in the URL fragment, so it never reaches the server, and is cleared from the address bar after loading. Linked TLV input is not saved to `localStorage`.
+
+### Fixed (2026-10-21)
+- ISO 8583 parser now knows DE 18 (merchant type) and DE 23 (card sequence number); before, any message carrying DE 18 misaligned every later field without reporting an error
+
 ### Fixed (2026-09-24)
 - AIP (82) decoder had every byte 1 label one bit too high; now matches EMV Book C-2 A.1.16, including on-device CVM, EMV mode and relay resistance bits and corrected presets
 - CVM Results (9F34) masks the "apply succeeding rule" flag, labels payment-system and issuer ranges, notes that Mastercard contactless uses `01` for on-device CVM, and relabels `3F` as "No CVM performed"
